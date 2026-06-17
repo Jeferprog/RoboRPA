@@ -196,6 +196,7 @@
       editingScript: null,
       runVariables: {},
       sim: null,
+      debugMode: false,
       storageEnabled: true,
       commonKeys: ['Tab', 'Enter', 'Escape', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backspace', 'Delete', 'F12'],
 
@@ -476,6 +477,10 @@
         };
         return keyMap[key] || `{${key}}`;
       },
+      // Escapa texto para ficar dentro de "aspas" numa string literal do VBScript (log)
+      escapeVBSString(text) {
+        return (text || '').replace(/"/g, '""').replace(/\r?\n/g, ' ');
+      },
 
       // Atualizar Variável de Execução
       updateRunVar(id, value) {
@@ -486,13 +491,38 @@
       downloadVBS(id) {
         const script = this.scripts.find(s => s.id === id);
         if (!script) return;
+        const debug = this.debugMode;
 
         let vbs = `' ==========================================\n`;
         vbs += `' Robô: ${script.name}\n`;
         vbs += `' Descrição: ${script.description}\n`;
         vbs += `' Gerado pelo Cresol RPA Web\n`;
         vbs += `' ==========================================\n\n`;
-        vbs += `Set WshShell = WScript.CreateObject("WScript.Shell")\n\n`;
+        vbs += `Set WshShell = WScript.CreateObject("WScript.Shell")\n`;
+
+        // Declarações globais para o passo "site" (uma só vez, evita Dim duplicado)
+        const hasSite = script.steps.some(s => s.type === 'site');
+        if (hasSite) {
+          vbs += `Dim ffFso, ff64, ff32\n`;
+          vbs += `Set ffFso = CreateObject("Scripting.FileSystemObject")\n`;
+          vbs += `ff64 = "C:\\Program Files\\Mozilla Firefox\\firefox.exe"\n`;
+          vbs += `ff32 = "C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe"\n`;
+        }
+
+        // --- Modo Depuração: log em arquivo + narração em voz ---
+        if (debug) {
+          vbs += `\n' --- Modo Depuração ---\n`;
+          vbs += `Dim dbgFso, dbgLog, dbgPath, dbgVoice, dbgStep\n`;
+          vbs += `Set dbgFso = CreateObject("Scripting.FileSystemObject")\n`;
+          vbs += `dbgPath = WshShell.SpecialFolders("Desktop") & "\\log_robo_${script.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt"\n`;
+          vbs += `Set dbgLog = dbgFso.CreateTextFile(dbgPath, True)\n`;
+          vbs += `dbgStep = 0\n`;
+          vbs += `On Error Resume Next\n`;
+          vbs += `Set dbgVoice = CreateObject("SAPI.SpVoice")\n`;
+          vbs += `On Error GoTo 0\n`;
+          vbs += `dbgLog.WriteLine Now & " - INICIO do robo: ${this.escapeVBSString(script.name)}"\n`;
+        }
+        vbs += `\n`;
 
         // Declarar e inicializar variáveis no VBScript
         if (script.variables.length > 0) {
@@ -512,6 +542,7 @@
               }
               vbs += `${v.id} = "${this.escapeVBSText(val)}"\n`;
             }
+            if (debug) vbs += `dbgLog.WriteLine "   Variavel ${v.id} = " & ${v.id}\n`;
           });
           vbs += `' ----------------------------------\n\n`;
         }
@@ -522,16 +553,33 @@
         // Executa os passos na ordem inversa (do último adicionado para o primeiro)
         const stepsToExecute = [...script.steps].reverse();
 
+        // Em depuração, segue mesmo se um passo falhar, para registrar o erro no log
+        if (debug) vbs += `On Error Resume Next\n`;
+
         // Lógica de Loop
         const hasLoop = script.loop && script.loop.enabled;
         if (hasLoop) {
           vbs += `Dim loopCount\n`;
           vbs += `For loopCount = 1 To ${script.loop.count}\n`;
           vbs += `  ' --- Início da Repetição (Ciclo ' & loopCount & ') ---\n`;
+          if (debug) {
+            vbs += `  dbgStep = 0\n`;
+            vbs += `  dbgLog.WriteLine Now & " - === Ciclo " & loopCount & " ==="\n`;
+          }
         }
 
         stepsToExecute.forEach(step => {
           let indent = hasLoop ? '  ' : '';
+
+          // Registro/narração antes de executar o passo (não rouba o foco da tela)
+          if (debug) {
+            const d = this.describeStep(step, script);
+            const label = this.escapeVBSString(`${d.title}: ${d.detail}`);
+            vbs += `${indent}dbgStep = dbgStep + 1\n`;
+            vbs += `${indent}dbgLog.WriteLine Now & " - PASSO " & dbgStep & ": ${label}"\n`;
+            vbs += `${indent}If Not (dbgVoice Is Nothing) Then dbgVoice.Speak "Passo " & dbgStep, 1\n`;
+          }
+
           if (step.type === 'wait') {
             vbs += `${indent}WScript.Sleep ${step.value} ' ${step.description}\n`;
           } else if (step.type === 'key') {
@@ -541,16 +589,11 @@
             vbs += `${indent}WshShell.Run "${step.value.replace(/"/g, '""')}" ' ${step.description}\n`;
             vbs += `${indent}WScript.Sleep 1000\n`;
           } else if (step.type === 'site') {
-            // Abre o endereço no Firefox. Tenta o caminho padrão (64 e 32 bits) e,
-            // se não existir, usa o navegador padrão do sistema.
+            // Abre o endereço no Firefox (caminhos declarados no topo). Se não existir, usa o navegador padrão.
             const url = (step.value || '').replace(/"/g, '""');
-            vbs += `${indent}Dim ff64, ff32 ' ${step.description}\n`;
-            vbs += `${indent}ff64 = "C:\\Program Files\\Mozilla Firefox\\firefox.exe"\n`;
-            vbs += `${indent}ff32 = "C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe"\n`;
-            vbs += `${indent}Dim fso : Set fso = CreateObject("Scripting.FileSystemObject")\n`;
-            vbs += `${indent}If fso.FileExists(ff64) Then\n`;
+            vbs += `${indent}If ffFso.FileExists(ff64) Then ' ${step.description}\n`;
             vbs += `${indent}  WshShell.Run """" & ff64 & """ -new-window ""${url}"""\n`;
-            vbs += `${indent}ElseIf fso.FileExists(ff32) Then\n`;
+            vbs += `${indent}ElseIf ffFso.FileExists(ff32) Then\n`;
             vbs += `${indent}  WshShell.Run """" & ff32 & """ -new-window ""${url}"""\n`;
             vbs += `${indent}Else\n`;
             vbs += `${indent}  WshShell.Run """${url}"""\n`;
@@ -558,7 +601,7 @@
             vbs += `${indent}WScript.Sleep 6000\n`;
           } else if (step.type === 'type') {
             let text = step.value;
-            
+
             // Injetar variáveis dinamicamente no VBScript
             let parts = text.split(/\{\{([^}]+)\}\}/);
             let vbsParts = [];
@@ -581,10 +624,22 @@
             vbs += `${indent}WshShell.SendKeys ${vbsParts.join(' & ')} ' ${step.description}\n`;
             vbs += `${indent}WScript.Sleep 500\n`;
           }
+
+          // Registra erro do passo, se houver
+          if (debug) {
+            vbs += `${indent}If Err.Number <> 0 Then dbgLog.WriteLine "   >> ERRO no passo " & dbgStep & ": " & Err.Description : Err.Clear\n`;
+          }
         });
 
         if (hasLoop) {
           vbs += `Next\n`;
+        }
+
+        if (debug) {
+          vbs += `On Error GoTo 0\n`;
+          vbs += `dbgLog.WriteLine Now & " - FIM do robo"\n`;
+          vbs += `dbgLog.Close\n`;
+          vbs += `WshShell.Run "notepad.exe """ & dbgPath & """", 1, False\n`;
         }
 
         vbs += `\nMsgBox "Robô finalizado com sucesso!", 64, "Aviso"`;
@@ -860,6 +915,12 @@
           <div class="alert-box">
             <span style="font-size:24px;">⚠️</span>
             <div>Ao clicar em baixar, um arquivo <strong>.vbs</strong> será salvo. Dê um duplo clique nele para rodar. Você terá 3 segundos para clicar na tela do sistema antes do robô começar a digitar.</div>
+          </div>
+          <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:16px; background:#fffbeb; border:1px solid #fde68a; padding:12px; border-radius:8px;">
+            <input type="checkbox" id="debug-checkbox" ${this.debugMode ? 'checked' : ''} onchange="app.debugMode = this.checked" style="width:auto; margin-top:3px;">
+            <label for="debug-checkbox" style="font-size:13px; color:#92400e; cursor:pointer;">
+              🐞 <strong>Modo depuração</strong> — gera um <strong>log de cada passo</strong> (com data/hora) na Área de Trabalho e <strong>narra os passos em voz</strong>, para você identificar exatamente onde o robô errou. O log abre no Bloco de Notas ao final.
+            </label>
           </div>
           <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
             <button class="btn-success" onclick="app.openSimulator('${script.id}')" style="padding:14px 24px; font-size:15px;">
