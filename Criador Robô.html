@@ -370,7 +370,7 @@
       // Funções de Passos
       addStep(type) {
         // Adiciona o novo passo no INÍCIO do array (topo da lista)
-        this.editingScript.steps.unshift({ id: this.generateId(), type, value: type==='wait'?'1000':type==='key'?'Tab':type==='run'?'calc.exe':'', description:'' });
+        this.editingScript.steps.unshift({ id: this.generateId(), type, value: type==='wait'?'1000':type==='key'?'Tab':type==='run'?'calc.exe':type==='site'?'https://www.cresol.com.br':'', description:'' });
         this.renderCreator();
       },
       removeStep(id) {
@@ -471,6 +471,22 @@
           } else if (step.type === 'run') {
             vbs += `${indent}WshShell.Run "${step.value.replace(/"/g, '""')}" ' ${step.description}\n`;
             vbs += `${indent}WScript.Sleep 1000\n`;
+          } else if (step.type === 'site') {
+            // Abre o endereço no Firefox. Tenta o caminho padrão (64 e 32 bits) e,
+            // se não existir, usa o navegador padrão do sistema.
+            const url = (step.value || '').replace(/"/g, '""');
+            vbs += `${indent}Dim ff64, ff32 ' ${step.description}\n`;
+            vbs += `${indent}ff64 = "C:\\Program Files\\Mozilla Firefox\\firefox.exe"\n`;
+            vbs += `${indent}ff32 = "C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe"\n`;
+            vbs += `${indent}Dim fso : Set fso = CreateObject("Scripting.FileSystemObject")\n`;
+            vbs += `${indent}If fso.FileExists(ff64) Then\n`;
+            vbs += `${indent}  WshShell.Run """" & ff64 & """ -new-window ""${url}"""\n`;
+            vbs += `${indent}ElseIf fso.FileExists(ff32) Then\n`;
+            vbs += `${indent}  WshShell.Run """" & ff32 & """ -new-window ""${url}"""\n`;
+            vbs += `${indent}Else\n`;
+            vbs += `${indent}  WshShell.Run """${url}"""\n`;
+            vbs += `${indent}End If\n`;
+            vbs += `${indent}WScript.Sleep 6000\n`;
           } else if (step.type === 'type') {
             let text = step.value;
             
@@ -648,9 +664,11 @@
             </div>`;
           } else if (s.type === 'run') {
             inputHtml = `<input type="text" value="${s.value}" onchange="app.updateStep('${s.id}', 'value', this.value)" placeholder="Caminho ou comando (ex: calc.exe)">`;
+          } else if (s.type === 'site') {
+            inputHtml = `<input type="text" value="${s.value}" onchange="app.updateStep('${s.id}', 'value', this.value)" placeholder="Endereço do site (ex: https://www.cresol.com.br)">`;
           }
 
-          const icon = s.type === 'key' ? '⌨️' : s.type === 'type' ? '🔤' : s.type === 'wait' ? '⏱️' : '🚀';
+          const icon = s.type === 'key' ? '⌨️' : s.type === 'type' ? '🔤' : s.type === 'wait' ? '⏱️' : s.type === 'site' ? '🌐' : '🚀';
           const stepNumber = this.editingScript.steps.length - index;
 
           return `
@@ -718,6 +736,7 @@
                   <button onclick="app.addStep('type')">🔤 Digitar Texto</button>
                   <button onclick="app.addStep('wait')">⏱️ Esperar</button>
                   <button onclick="app.addStep('run')">🚀 Abrir Programa</button>
+                  <button onclick="app.addStep('site')">🌐 Abrir Site (Firefox)</button>
                 </div>
               </div>
               <div style="padding: 12px 20px; background: #f0fdf4; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between;">
