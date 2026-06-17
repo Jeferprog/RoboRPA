@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cresol RPA Web - Offline</title>
+  <style>
+    /* =========================================
+       ESTILOS (CSS PURO - SEM DEPENDÊNCIAS)
+       ========================================= */
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background-color: #f3f4f6; color: #1f2937; height: 100vh; display: flex; flex-direction: column; }
+    h1, h2, h3, p { margin: 0; }
+    button { cursor: pointer; border: none; background: none; font-family: inherit; transition: all 0.2s; }
+    input, select, textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; font-size: 14px; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #005A40; box-shadow: 0 0 0 3px rgba(0,90,64,0.1); }
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+    /* Alertas */
+    #storage-warning { display: none; background-color: #fee2e2; color: #991b1b; padding: 12px; text-align: center; font-size: 14px; font-weight: 600; border-bottom: 1px solid #f87171; }
+
+    /* Header */
+    .header { background-color: #005A40; color: white; padding: 0 24px; height: 64px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex-shrink: 0; }
+    .header-title { font-size: 20px; font-weight: bold; display: flex; align-items: center; gap: 10px; }
+    .header-title span { color: #F26522; font-size: 24px; }
+    .nav-buttons button { color: white; padding: 8px 16px; border-radius: 6px; margin-left: 10px; font-weight: 500; opacity: 0.8; font-size: 14px; }
+    .nav-buttons button.active { background-color: rgba(255,255,255,0.2); opacity: 1; }
+    .nav-buttons button:hover { background-color: rgba(255,255,255,0.15); }
+
+    /* Layout Principal */
+    .container { max-width: 1200px; margin: 24px auto; display: flex; gap: 24px; flex: 1; width: 100%; padding: 0 24px; min-height: 0; }
+    .panel { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; display: flex; flex-direction: column; overflow: hidden; }
+    .hidden { display: none !important; }
+
+    /* Aba: Executar Robôs */
+    #runner-view { display: flex; width: 100%; gap: 24px; }
+    .sidebar { width: 320px; flex-shrink: 0; display: flex; flex-direction: column; }
+    .sidebar-header { padding: 16px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; font-weight: bold; color: #374151; }
+    .btn-icon { padding: 6px; border-radius: 6px; color: #6b7280; font-size: 16px; background: #e5e7eb; }
+    .btn-icon:hover { background: #d1d5db; color: #1f2937; }
+    .script-list { flex: 1; overflow-y: auto; padding: 12px; }
+    .script-item { padding: 12px; border-radius: 8px; margin-bottom: 8px; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; }
+    .script-item:hover { background: #f9fafb; }
+    .script-item.active { background: #ecfdf5; border-color: #a7f3d0; }
+    .script-item-title { font-weight: 600; color: #374151; }
+    .script-item.active .script-item-title { color: #065f46; }
+    .script-item-desc { font-size: 12px; color: #6b7280; margin-top: 4px; }
+    
+    /* Backup Controls */
+    .backup-controls { padding: 12px; background: #f9fafb; border-top: 1px solid #e5e7eb; display: flex; gap: 8px; }
+    .backup-controls button { flex: 1; padding: 8px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid #d1d5db; background: white; color: #4b5563; }
+    .backup-controls button:hover { background: #e5e7eb; }
+
+    .main-content { flex: 1; padding: 32px; overflow-y: auto; }
+    .script-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; }
+    .script-title { font-size: 28px; font-weight: bold; color: #111827; }
+    .script-desc { color: #4b5563; margin-top: 8px; font-size: 15px; }
+    .action-buttons { display: flex; gap: 12px; }
+    .btn-outline { border: 1px solid #d1d5db; padding: 8px 16px; border-radius: 6px; color: #4b5563; font-weight: 500; font-size: 14px; background: white; }
+    .btn-outline:hover { background: #f9fafb; border-color: #9ca3af; }
+    
+    .variables-section { background: #f9fafb; padding: 24px; border-radius: 12px; border: 1px solid #e5e7eb; margin-bottom: 32px; }
+    .variables-title { font-size: 14px; font-weight: bold; text-transform: uppercase; color: #374151; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #374151; }
+    
+    .alert-box { background: #fff7ed; border: 1px solid #ffedd5; padding: 20px; border-radius: 12px; color: #9a3412; font-size: 15px; margin-bottom: 32px; display: flex; gap: 16px; align-items: center; }
+    .btn-primary { background: #F26522; color: white; padding: 14px 28px; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-flex; align-items: center; gap: 10px; box-shadow: 0 4px 6px rgba(242, 101, 34, 0.2); }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-success { background: #005A40; color: white; padding: 10px 20px; border-radius: 6px; font-weight: bold; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
+    .btn-success:hover { opacity: 0.9; }
+
+    /* Aba: Criar / Editar */
+    #creator-view { display: flex; width: 100%; padding: 24px; flex-direction: column; }
+    .creator-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; padding-bottom: 20px; margin-bottom: 24px; }
+    .creator-columns { display: flex; gap: 32px; flex: 1; overflow: hidden; }
+    .col-left { width: 380px; display: flex; flex-direction: column; gap: 24px; overflow-y: auto; padding-right: 12px; }
+    .col-right { flex: 1; display: flex; flex-direction: column; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
+    
+    .var-card { background: white; border: 1px solid #e5e7eb; padding: 16px; border-radius: 8px; margin-bottom: 16px; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .var-card input.var-name { border: none; border-bottom: 1px solid #e5e7eb; border-radius: 0; padding: 4px 0; margin-bottom: 12px; font-weight: 600; font-size: 15px; }
+    .var-card input.var-name:focus { box-shadow: none; border-bottom-color: #005A40; }
+    .var-card-footer { display: flex; justify-content: space-between; align-items: center; }
+    .var-card-footer select { width: auto; padding: 6px; font-size: 13px; }
+    .code-tag { background: #f3f4f6; color: #4b5563; padding: 4px 8px; border-radius: 4px; font-family: monospace; font-size: 12px; border: 1px solid #e5e7eb; }
+    .btn-remove-var { position: absolute; top: -10px; right: -10px; color: white; background: #ef4444; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 12px; opacity: 0; transition: opacity 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .var-card:hover .btn-remove-var { opacity: 1; }
+
+    .steps-header { padding: 20px; background: white; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; }
+    .steps-actions button { background: #f3f4f6; border: 1px solid #d1d5db; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; margin-left: 8px; color: #374151; }
+    .steps-actions button:hover { background: #e5e7eb; }
+    .steps-list { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+    
+    .step-card { background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; display: flex; gap: 20px; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: border-color 0.2s; }
+    .step-card:hover { border-color: #d1d5db; }
+    .step-controls { display: flex; flex-direction: column; gap: 4px; }
+    .step-controls button { color: #9ca3af; padding: 4px; font-size: 12px; background: #f9fafb; border-radius: 4px; border: 1px solid transparent; }
+    .step-controls button:hover:not(:disabled) { color: #4b5563; border-color: #e5e7eb; }
+    .step-icon { width: 48px; height: 48px; border-radius: 50%; background: #f9fafb; border: 1px solid #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; position: relative; }
+    .step-content { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .step-remove { color: #9ca3af; padding: 10px; border-radius: 6px; background: #f3f4f6; }
+    .step-remove:hover { color: #ef4444; background: #fee2e2; }
+
+    .empty-state { text-align: center; padding: 60px 20px; color: #9ca3af; }
+  </style>
+</head>
+<body>
+
+  <!-- AVISO DE SEGURANÇA DO FIREFOX -->
+  <div id="storage-warning">
+    ⚠️ Aviso: O Firefox bloqueou o salvamento automático por segurança. Use os botões "Exportar" e "Importar" no canto inferior esquerdo para salvar seus robôs no computador.
+  </div>
+
+  <!-- CABEÇALHO -->
+  <div class="header">
+    <div class="header-title"><span>🤖</span> Cresol RPA Web</div>
+    <div class="nav-buttons">
+      <button id="tab-runner" class="active" onclick="app.switchTab('runner')">Executar Robôs</button>
+      <button id="tab-creator" onclick="app.switchTab('creator')">Criar / Editar</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- ABA: EXECUTAR ROBÔS -->
+    <div id="runner-view">
+      <div class="panel sidebar">
+        <div class="sidebar-header">
+          Meus Robôs
+          <button class="btn-icon" onclick="app.startNewScript()" title="Novo Robô">➕ Novo</button>
+        </div>
+        <div class="script-list" id="script-list"></div>
+        
+        <!-- NOVOS BOTÕES DE BACKUP -->
+        <div class="backup-controls">
+          <button onclick="app.exportBackup()" title="Salva a lista de robôs em um arquivo">📥 Exportar</button>
+          <button onclick="document.getElementById('import-file').click()" title="Carrega robôs de um arquivo salvo">📤 Importar</button>
+          <input type="file" id="import-file" style="display:none" accept=".json" onchange="app.importBackup(event)">
+        </div>
+      </div>
+      <div class="panel main-content" id="runner-content">
+        <!-- Conteúdo injetado via JS -->
+      </div>
+    </div>
+
+    <!-- ABA: CRIAR / EDITAR -->
+    <div id="creator-view" class="panel hidden">
+      <!-- Conteúdo injetado via JS -->
+    </div>
+  </div>
+
+  <!-- =========================================
+       LÓGICA DO SISTEMA (JAVASCRIPT PURO)
+       ========================================= -->
+  <script>
+    window.app = {
+      scripts: [],
+      activeTab: 'runner',
+      selectedScriptId: null,
+      editingScript: null,
+      runVariables: {},
+      storageEnabled: true,
+      commonKeys: ['Tab', 'Enter', 'Escape', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backspace', 'Delete', 'F12'],
+
+      // Inicialização com Proteção
+      init() {
+        try {
+          const saved = localStorage.getItem('cresol_rpa_offline_v7');
+          if (saved) {
+            this.scripts = JSON.parse(saved);
+            if (this.scripts.length > 0) {
+              this.selectedScriptId = this.scripts[0].id;
+              this.initRunVariables();
+            }
+          }
+        } catch (error) {
+          this.storageEnabled = false;
+          document.getElementById('storage-warning').style.display = 'block';
+        }
+        this.render();
+      },
+
+      // Salvar no navegador
+      save() {
+        if (!this.storageEnabled) return;
+        try {
+          localStorage.setItem('cresol_rpa_offline_v7', JSON.stringify(this.scripts));
+        } catch (error) {
+          console.warn("Não foi possível salvar no navegador.");
+        }
+      },
+
+      // =========================================
+      // NOVAS FUNÇÕES: IMPORTAR E EXPORTAR
+      // =========================================
+      exportBackup() {
+        if (this.scripts.length === 0) {
+          alert("Não há robôs para exportar.");
+          return;
+        }
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.scripts));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href",     dataStr);
+        downloadAnchorNode.setAttribute("download", "cresol_robos_backup.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+      },
+
+      importBackup(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const importedScripts = JSON.parse(e.target.result);
+            if (Array.isArray(importedScripts)) {
+              // Pergunta se quer substituir ou adicionar
+              if (this.scripts.length > 0) {
+                if (confirm("Deseja substituir os robôs atuais pelos importados? (Clique em OK para substituir, ou Cancelar para apenas adicionar à lista existente)")) {
+                  this.scripts = importedScripts;
+                } else {
+                  this.scripts = [...this.scripts, ...importedScripts];
+                }
+              } else {
+                this.scripts = importedScripts;
+              }
+              
+              this.save();
+              if (this.scripts.length > 0) {
+                this.selectedScriptId = this.scripts[0].id;
+                this.initRunVariables();
+              }
+              this.render();
+              alert("Robôs importados com sucesso!");
+            } else {
+              alert("Arquivo inválido.");
+            }
+          } catch (error) {
+            alert("Erro ao ler o arquivo. Certifique-se de que é um arquivo .json válido.");
+          }
+        };
+        reader.readAsText(file);
+        // Limpa o input para permitir importar o mesmo arquivo novamente se necessário
+        event.target.value = '';
+      },
+
+      generateId() {
+        return Math.random().toString(36).substr(2, 9);
+      },
+
+      switchTab(tab) {
+        if (tab === 'creator' && !this.editingScript) {
+          this.startNewScript();
+          return;
+        }
+        this.activeTab = tab;
+        this.render();
+      },
+
+      startNewScript() {
+        this.editingScript = { id: this.generateId(), name: 'Novo Robô', description: '', variables: [], steps: [] };
+        this.activeTab = 'creator';
+        this.render();
+      },
+
+      editScript(id) {
+        const script = this.scripts.find(s => s.id === id);
+        if (script) {
+          this.editingScript = JSON.parse(JSON.stringify(script));
+          this.activeTab = 'creator';
+          this.render();
+        }
+      },
+
+      deleteScript(id) {
+        if (confirm('Tem certeza que deseja excluir este robô?')) {
+          this.scripts = this.scripts.filter(s => s.id !== id);
+          if (this.selectedScriptId === id) {
+            this.selectedScriptId = this.scripts.length > 0 ? this.scripts[0].id : null;
+            this.initRunVariables();
+          }
+          this.save();
+          this.render();
+        }
+      },
+
+      selectScript(id) {
+        this.selectedScriptId = id;
+        this.initRunVariables();
+        this.render();
+      },
+
+      saveEditingScript() {
+        if (!this.editingScript) return;
+        const index = this.scripts.findIndex(s => s.id === this.editingScript.id);
+        if (index >= 0) {
+          this.scripts[index] = this.editingScript;
+        } else {
+          this.scripts.push(this.editingScript);
+        }
+        this.selectedScriptId = this.editingScript.id;
+        this.editingScript = null;
+        this.activeTab = 'runner';
+        this.save();
+        this.initRunVariables();
+        this.render();
+      },
+
+      cancelEdit() {
+        this.editingScript = null;
+        this.activeTab = 'runner';
+        this.render();
+      },
+
+      // Inicializa as variáveis de execução calculando datas automáticas
+      initRunVariables() {
+        const script = this.scripts.find(s => s.id === this.selectedScriptId);
+        if (!script) return;
+        
+        this.runVariables = {};
+        script.variables.forEach(v => {
+          if (v.type === 'date_calc') {
+            const offset = parseInt(v.defaultValue) || 0;
+            const d = new Date();
+            d.setDate(d.getDate() + offset);
+            // Formata para YYYY-MM-DD para o input type="date"
+            this.runVariables[v.id] = d.toISOString().split('T')[0];
+          } else {
+            this.runVariables[v.id] = '';
+          }
+        });
+      },
+
+      // Funções de Variáveis
+      addVariable() {
+        this.editingScript.variables.push({ id: 'VAR_' + this.generateId().toUpperCase(), name: 'Nova Variável', type: 'text', defaultValue: '0' });
+        this.renderCreator();
+      },
+      removeVariable(id) {
+        this.editingScript.variables = this.editingScript.variables.filter(v => v.id !== id);
+        this.renderCreator();
+      },
+      updateVariable(id, field, value) {
+        const v = this.editingScript.variables.find(x => x.id === id);
+        if (v) v[field] = value;
+        if (field === 'type') this.renderCreator();
+      },
+
+      // Funções de Loop
+      toggleLoop() {
+        if (!this.editingScript.loop) {
+          this.editingScript.loop = { enabled: true, count: 2 };
+        } else {
+          this.editingScript.loop.enabled = !this.editingScript.loop.enabled;
+        }
+        this.renderCreator();
+      },
+      updateLoopCount(count) {
+        if (this.editingScript.loop) {
+          this.editingScript.loop.count = parseInt(count) || 1;
+        }
+      },
+
+      // Funções de Passos
+      addStep(type) {
+        // Adiciona o novo passo no INÍCIO do array (topo da lista)
+        this.editingScript.steps.unshift({ id: this.generateId(), type, value: type==='wait'?'1000':type==='key'?'Tab':type==='run'?'calc.exe':'', description:'' });
+        this.renderCreator();
+      },
+      removeStep(id) {
+        this.editingScript.steps = this.editingScript.steps.filter(s => s.id !== id);
+        this.renderCreator();
+      },
+      updateStep(id, field, value) {
+        const s = this.editingScript.steps.find(x => x.id === id);
+        if (s) s[field] = value;
+        if (field === 'type' || (field === 'value' && s.type === 'key')) this.renderCreator();
+      },
+      moveStep(index, dir) {
+        // dir: -1 (sobe na tela, vai para índice menor), 1 (desce na tela, vai para índice maior)
+        const newIndex = index + dir;
+        if (newIndex >= 0 && newIndex < this.editingScript.steps.length) {
+          const temp = this.editingScript.steps[index];
+          this.editingScript.steps[index] = this.editingScript.steps[newIndex];
+          this.editingScript.steps[newIndex] = temp;
+          this.renderCreator();
+        }
+      },
+
+      // Escapar caracteres para VBScript
+      escapeVBSText(text) {
+        let escaped = text.replace(/"/g, '""');
+        escaped = escaped.replace(/([+^%~()[\]{}])/g, '{$1}');
+        return escaped;
+      },
+      escapeVBSKey(key) {
+        const keyMap = {
+          'Tab': '{TAB}', 'Enter': '{ENTER}', 'Escape': '{ESC}', 'Space': ' ',
+          'ArrowUp': '{UP}', 'ArrowDown': '{DOWN}', 'ArrowLeft': '{LEFT}', 'ArrowRight': '{RIGHT}',
+          'Backspace': '{BACKSPACE}', 'Delete': '{DEL}'
+        };
+        return keyMap[key] || `{${key}}`;
+      },
+
+      // Atualizar Variável de Execução
+      updateRunVar(id, value) {
+        this.runVariables[id] = value;
+      },
+
+      // Baixar VBS
+      downloadVBS(id) {
+        const script = this.scripts.find(s => s.id === id);
+        if (!script) return;
+
+        let vbs = `' ==========================================\n`;
+        vbs += `' Robô: ${script.name}\n`;
+        vbs += `' Descrição: ${script.description}\n`;
+        vbs += `' Gerado pelo Cresol RPA Web\n`;
+        vbs += `' ==========================================\n\n`;
+        vbs += `Set WshShell = WScript.CreateObject("WScript.Shell")\n\n`;
+
+        // Declarar e inicializar variáveis no VBScript
+        if (script.variables.length > 0) {
+          vbs += `' --- Inicialização de Variáveis ---\n`;
+          script.variables.forEach(v => {
+            vbs += `Dim ${v.id}\n`;
+            if (v.type === 'date_calc') {
+              const offset = parseInt(v.defaultValue) || 0;
+              // VBScript para calcular a data dinamicamente no momento da execução
+              vbs += `${v.id} = Right("0" & Day(DateAdd("d", ${offset}, Date())), 2) & "/" & Right("0" & Month(DateAdd("d", ${offset}, Date())), 2) & "/" & Year(DateAdd("d", ${offset}, Date()))\n`;
+            } else {
+              // Para texto e data manual, pega o valor que o usuário digitou na tela de execução
+              let val = this.runVariables[v.id] || '';
+              if (v.type === 'date' && val) {
+                const parts = val.split('-');
+                if (parts.length === 3) val = `${parts[2]}/${parts[1]}/${parts[0]}`;
+              }
+              vbs += `${v.id} = "${this.escapeVBSText(val)}"\n`;
+            }
+          });
+          vbs += `' ----------------------------------\n\n`;
+        }
+
+        vbs += `MsgBox "O robô vai começar em 3 segundos. Clique na tela do sistema agora!", 64, "Aviso"\n`;
+        vbs += `WScript.Sleep 3000\n\n`;
+
+        // Executa os passos na ordem inversa (do último adicionado para o primeiro)
+        const stepsToExecute = [...script.steps].reverse();
+
+        // Lógica de Loop
+        const hasLoop = script.loop && script.loop.enabled;
+        if (hasLoop) {
+          vbs += `Dim loopCount\n`;
+          vbs += `For loopCount = 1 To ${script.loop.count}\n`;
+          vbs += `  ' --- Início da Repetição (Ciclo ' & loopCount & ') ---\n`;
+        }
+
+        stepsToExecute.forEach(step => {
+          let indent = hasLoop ? '  ' : '';
+          if (step.type === 'wait') {
+            vbs += `${indent}WScript.Sleep ${step.value} ' ${step.description}\n`;
+          } else if (step.type === 'key') {
+            vbs += `${indent}WshShell.SendKeys "${this.escapeVBSKey(step.value)}" ' ${step.description}\n`;
+            vbs += `${indent}WScript.Sleep 300\n`;
+          } else if (step.type === 'run') {
+            vbs += `${indent}WshShell.Run "${step.value.replace(/"/g, '""')}" ' ${step.description}\n`;
+            vbs += `${indent}WScript.Sleep 1000\n`;
+          } else if (step.type === 'type') {
+            let text = step.value;
+            
+            // Injetar variáveis dinamicamente no VBScript
+            let parts = text.split(/\{\{([^}]+)\}\}/);
+            let vbsParts = [];
+            for (let i = 0; i < parts.length; i++) {
+              if (i % 2 === 0) {
+                if (parts[i] !== '') {
+                  vbsParts.push('"' + this.escapeVBSText(parts[i]) + '"');
+                }
+              } else {
+                const varId = parts[i];
+                if (script.variables.some(v => v.id === varId)) {
+                  vbsParts.push(varId);
+                } else {
+                  vbsParts.push('"' + this.escapeVBSText('{{' + varId + '}}') + '"');
+                }
+              }
+            }
+            if (vbsParts.length === 0) vbsParts.push('""');
+
+            vbs += `${indent}WshShell.SendKeys ${vbsParts.join(' & ')} ' ${step.description}\n`;
+            vbs += `${indent}WScript.Sleep 500\n`;
+          }
+        });
+
+        if (hasLoop) {
+          vbs += `Next\n`;
+        }
+
+        vbs += `\nMsgBox "Robô finalizado com sucesso!", 64, "Aviso"`;
+
+        const blob = new Blob([vbs], { type: 'text/vbs;charset=windows-1252' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${script.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.vbs`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+
+      // =========================================
+      // RENDERIZAÇÃO (DOM MANIPULATION)
+      // =========================================
+      render() {
+        document.getElementById('tab-runner').className = this.activeTab === 'runner' ? 'active' : '';
+        document.getElementById('tab-creator').className = this.activeTab === 'creator' ? 'active' : '';
+        
+        const runnerView = document.getElementById('runner-view');
+        const creatorView = document.getElementById('creator-view');
+
+        if (this.activeTab === 'runner') {
+          runnerView.classList.remove('hidden');
+          creatorView.classList.add('hidden');
+          this.renderRunner();
+        } else {
+          runnerView.classList.add('hidden');
+          creatorView.classList.remove('hidden');
+          this.renderCreator();
+        }
+      },
+
+      renderRunner() {
+        // Renderizar Lista
+        const list = document.getElementById('script-list');
+        if (this.scripts.length === 0) {
+          list.innerHTML = `<div class="empty-state"><p>Nenhum robô criado.</p><button onclick="app.startNewScript()" style="color:#F26522; margin-top:10px; font-weight:bold;">Criar o primeiro</button></div>`;
+        } else {
+          list.innerHTML = this.scripts.map(s => `
+            <div class="script-item ${this.selectedScriptId === s.id ? 'active' : ''}" onclick="app.selectScript('${s.id}')">
+              <div class="script-item-title">${s.name}</div>
+              <div class="script-item-desc">${s.steps.length} passos</div>
+            </div>
+          `).join('');
+        }
+
+        // Renderizar Conteúdo
+        const content = document.getElementById('runner-content');
+        const script = this.scripts.find(s => s.id === this.selectedScriptId);
+        
+        if (!script) {
+          content.innerHTML = `<div class="empty-state" style="margin-top:100px; font-size:18px;">Selecione um robô na lista para executar</div>`;
+          return;
+        }
+
+        let varsHtml = '';
+        if (script.variables.length > 0) {
+          varsHtml = `
+            <div class="variables-section">
+              <div class="variables-title">⚙️ Parâmetros da Execução</div>
+              ${script.variables.map(v => `
+                <div class="form-group">
+                  <label>
+                    ${v.name}
+                    ${v.type === 'date_calc' ? '<span style="color:#F26522; font-size:11px; font-weight:normal; margin-left:6px;">(Calculada no momento da execução do robô)</span>' : ''}
+                  </label>
+                  <input type="${(v.type === 'date' || v.type === 'date_calc') ? 'date' : 'text'}" 
+                         value="${this.runVariables[v.id] || ''}" 
+                         onchange="app.updateRunVar('${v.id}', this.value)"
+                         placeholder="Informe ${v.name.toLowerCase()}..."
+                         ${v.type === 'date_calc' ? 'disabled title="Esta data será calculada automaticamente pelo robô quando ele for executado."' : ''}>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }
+
+        content.innerHTML = `
+          <div class="script-header">
+            <div>
+              <div class="script-title">${script.name}</div>
+              <div class="script-desc">${script.description || 'Sem descrição.'}</div>
+            </div>
+            <div class="action-buttons">
+              <button class="btn-outline" onclick="app.editScript('${script.id}')">✏️ Editar</button>
+              <button class="btn-outline" onclick="app.deleteScript('${script.id}')" style="color:#ef4444;">🗑️ Excluir</button>
+            </div>
+          </div>
+          ${varsHtml}
+          <div class="alert-box">
+            <span style="font-size:24px;">⚠️</span>
+            <div>Ao clicar em baixar, um arquivo <strong>.vbs</strong> será salvo. Dê um duplo clique nele para rodar. Você terá 3 segundos para clicar na tela do sistema antes do robô começar a digitar.</div>
+          </div>
+          <button class="btn-primary" onclick="app.downloadVBS('${script.id}')">
+            ⬇️ Baixar Arquivo Executável (.vbs)
+          </button>
+        `;
+      },
+
+      renderCreator() {
+        const view = document.getElementById('creator-view');
+        if (!this.editingScript) return;
+
+        let varsHtml = this.editingScript.variables.map(v => `
+          <div class="var-card">
+            <button class="btn-remove-var" onclick="app.removeVariable('${v.id}')">✖</button>
+            <input type="text" class="var-name" value="${v.name}" oninput="app.updateVariable('${v.id}', 'name', this.value)" placeholder="Nome do campo">
+            <div class="var-card-footer">
+              <select onchange="app.updateVariable('${v.id}', 'type', this.value)">
+                <option value="text" ${v.type === 'text' ? 'selected' : ''}>Texto Livre</option>
+                <option value="date" ${v.type === 'date' ? 'selected' : ''}>Data (Manual)</option>
+                <option value="date_calc" ${v.type === 'date_calc' ? 'selected' : ''}>Data Automática</option>
+              </select>
+              <span class="code-tag">{{${v.id}}}</span>
+            </div>
+            ${v.type === 'date_calc' ? `
+              <div style="margin-top: 12px; display: flex; align-items: center; gap: 8px; background: #f9fafb; padding: 8px; border-radius: 6px; border: 1px solid #e5e7eb;">
+                <span style="font-size: 12px; color: #4b5563; flex: 1;">Dias em relação a hoje:</span>
+                <input type="number" value="${v.defaultValue || '0'}" oninput="app.updateVariable('${v.id}', 'defaultValue', this.value)" style="width: 80px; padding: 4px 8px; margin: 0;" placeholder="ex: -15">
+              </div>
+            ` : ''}
+          </div>
+        `).join('');
+
+        if (this.editingScript.variables.length === 0) {
+          varsHtml = `<div class="empty-state" style="padding:20px;">Nenhuma variável criada.</div>`;
+        }
+
+        let stepsHtml = this.editingScript.steps.map((s, index) => {
+          let inputHtml = '';
+          if (s.type === 'key') {
+            inputHtml = `<select onchange="app.updateStep('${s.id}', 'value', this.value)">
+              ${this.commonKeys.map(k => `<option value="${k}" ${s.value === k ? 'selected' : ''}>${k}</option>`).join('')}
+              <option disabled>---</option>
+              <option value="A" ${s.value === 'A' ? 'selected' : ''}>Letra A</option>
+              <option value="B" ${s.value === 'B' ? 'selected' : ''}>Letra B</option>
+            </select>`;
+          } else if (s.type === 'type') {
+            inputHtml = `<input type="text" value="${s.value}" onchange="app.updateStep('${s.id}', 'value', this.value)" placeholder="Texto para digitar...">`;
+          } else if (s.type === 'wait') {
+            inputHtml = `<div style="display:flex; align-items:center; gap:8px;">
+              <input type="number" value="${s.value}" onchange="app.updateStep('${s.id}', 'value', this.value)" style="width:100px;">
+              <span style="font-size:12px; color:#6b7280;">ms</span>
+            </div>`;
+          } else if (s.type === 'run') {
+            inputHtml = `<input type="text" value="${s.value}" onchange="app.updateStep('${s.id}', 'value', this.value)" placeholder="Caminho ou comando (ex: calc.exe)">`;
+          }
+
+          const icon = s.type === 'key' ? '⌨️' : s.type === 'type' ? '🔤' : s.type === 'wait' ? '⏱️' : '🚀';
+          const stepNumber = this.editingScript.steps.length - index;
+
+          return `
+            <div class="step-card">
+              <div class="step-controls">
+                <button onclick="app.moveStep(${index}, -1)" ${index === 0 ? 'disabled' : ''} title="Mover para cima">▲</button>
+                <button onclick="app.moveStep(${index}, 1)" ${index === this.editingScript.steps.length - 1 ? 'disabled' : ''} title="Mover para baixo">▼</button>
+              </div>
+              <div class="step-icon" title="Passo ${stepNumber}">
+                <div style="font-size: 10px; font-weight: bold; color: #9ca3af; position: absolute; top: -8px; left: -8px; background: white; padding: 2px 4px; border-radius: 4px; border: 1px solid #e5e7eb;">#${stepNumber}</div>
+                ${icon}
+              </div>
+              <div class="step-content">
+                <div>${inputHtml}</div>
+                <div><input type="text" value="${s.description}" oninput="app.updateStep('${s.id}', 'description', this.value)" placeholder="Descrição (ex: Clica no botão)"></div>
+              </div>
+              <button class="step-remove" onclick="app.removeStep('${s.id}')">🗑️</button>
+            </div>
+          `;
+        }).join('');
+
+        if (this.editingScript.steps.length === 0) {
+          stepsHtml = `<div class="empty-state">Nenhum passo adicionado. Use os botões acima.</div>`;
+        }
+
+        let tipsHtml = '';
+        if (this.editingScript.variables.length > 0) {
+          tipsHtml = `<div style="padding:12px; background:#eff6ff; border-top:1px solid #bfdbfe; font-size:13px; color:#1e40af; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <strong>Dica:</strong> Para usar variáveis no texto, copie e cole: 
+            ${this.editingScript.variables.map(v => `<span class="code-tag" style="background:white;">{{${v.id}}}</span>`).join('')}
+          </div>`;
+        }
+
+        view.innerHTML = `
+          <div class="creator-header">
+            <h2 style="font-size:24px; color:#111827;">Criar / Editar Robô</h2>
+            <div style="display:flex; gap:12px;">
+              <button class="btn-outline" onclick="app.cancelEdit()">Cancelar</button>
+              <button class="btn-success" onclick="app.saveEditingScript()">💾 Salvar Robô</button>
+            </div>
+          </div>
+          <div class="creator-columns">
+            <div class="col-left">
+              <div class="form-group">
+                <label>Nome do Robô</label>
+                <input type="text" value="${this.editingScript.name}" onchange="app.editingScript.name = this.value">
+              </div>
+              <div class="form-group">
+                <label>Descrição</label>
+                <textarea rows="3" onchange="app.editingScript.description = this.value" placeholder="O que este robô faz?">${this.editingScript.description}</textarea>
+              </div>
+              <div style="background:#f9fafb; padding:20px; border-radius:12px; border:1px solid #e5e7eb;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                  <h3 style="font-size:14px; color:#374151;">⚙️ Variáveis Dinâmicas</h3>
+                  <button class="btn-outline" style="padding:4px 8px; font-size:12px;" onclick="app.addVariable()">+ Adicionar</button>
+                </div>
+                ${varsHtml}
+              </div>
+            </div>
+            <div class="col-right">
+              <div class="steps-header">
+                <h3 style="font-size:16px; color:#111827;">Passos do Robô</h3>
+                <div class="steps-actions">
+                  <button onclick="app.addStep('key')">⌨️ Tecla</button>
+                  <button onclick="app.addStep('type')">🔤 Digitar Texto</button>
+                  <button onclick="app.addStep('wait')">⏱️ Esperar</button>
+                  <button onclick="app.addStep('run')">🚀 Abrir Programa</button>
+                </div>
+              </div>
+              <div style="padding: 12px 20px; background: #f0fdf4; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <input type="checkbox" id="loop-checkbox" ${this.editingScript.loop && this.editingScript.loop.enabled ? 'checked' : ''} onchange="app.toggleLoop()">
+                  <label for="loop-checkbox" style="font-size: 14px; font-weight: 600; color: #166534; cursor: pointer;">🔁 Repetir todos os passos (Loop)</label>
+                </div>
+                ${this.editingScript.loop && this.editingScript.loop.enabled ? `
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 13px; color: #166534;">Quantas vezes?</span>
+                    <input type="number" value="${this.editingScript.loop.count || 2}" onchange="app.updateLoopCount(this.value)" style="width: 70px; padding: 4px; border-color: #bbf7d0;">
+                  </div>
+                ` : ''}
+              </div>
+              <div class="steps-list">
+                ${stepsHtml}
+              </div>
+              ${tipsHtml}
+            </div>
+          </div>
+        `;
+      }
+    };
+
+    window.onload = function() {
+      app.init();
+    };
+  </script>
+</body>
+</html>
