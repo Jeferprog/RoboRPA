@@ -411,6 +411,15 @@
         this.editingScript.steps = this.editingScript.steps.filter(s => s.id !== id);
         this.renderCreator();
       },
+      duplicateStep(id) {
+        const index = this.editingScript.steps.findIndex(s => s.id === id);
+        if (index < 0) return;
+        const copy = JSON.parse(JSON.stringify(this.editingScript.steps[index]));
+        copy.id = this.generateId();
+        // Insere a cópia logo abaixo do original na lista
+        this.editingScript.steps.splice(index + 1, 0, copy);
+        this.renderCreator();
+      },
       updateStep(id, field, value) {
         const s = this.editingScript.steps.find(x => x.id === id);
         if (s) s[field] = value;
@@ -1007,7 +1016,10 @@
                 <div>${inputHtml}</div>
                 <div><input type="text" value="${s.description}" oninput="app.updateStep('${s.id}', 'description', this.value)" placeholder="Descrição (ex: Clica no botão)"></div>
               </div>
-              <button class="step-remove" onclick="app.removeStep('${s.id}')">🗑️</button>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <button class="step-remove" onclick="app.duplicateStep('${s.id}')" title="Duplicar etapa" style="color:#005A40;">⧉</button>
+                <button class="step-remove" onclick="app.removeStep('${s.id}')" title="Excluir etapa">🗑️</button>
+              </div>
             </div>
           `;
         }).join('');
