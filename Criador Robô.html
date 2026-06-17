@@ -112,6 +112,33 @@
     .step-remove:hover { color: #ef4444; background: #fee2e2; }
 
     .empty-state { text-align: center; padding: 60px 20px; color: #9ca3af; }
+
+    /* Simulador (Teste seguro) */
+    .sim-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 24px; }
+    .sim-modal { background: white; border-radius: 12px; width: 100%; max-width: 780px; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+    .sim-header { background: #005A40; color: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+    .sim-header h3 { font-size: 18px; }
+    .sim-close { color: white; font-size: 20px; opacity: 0.85; }
+    .sim-close:hover { opacity: 1; }
+    .sim-banner { background: #ecfdf5; color: #065f46; font-size: 13px; padding: 10px 24px; border-bottom: 1px solid #a7f3d0; }
+    .sim-body { display: flex; gap: 16px; padding: 20px; overflow: hidden; flex: 1; min-height: 0; }
+    .sim-steps, .sim-log { flex: 1; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; background: #f9fafb; min-height: 220px; }
+    .sim-steps h4, .sim-log h4 { font-size: 11px; text-transform: uppercase; color: #6b7280; margin-bottom: 10px; letter-spacing: 0.03em; }
+    .sim-step-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px; border-radius: 6px; font-size: 13px; color: #374151; margin-bottom: 4px; border: 1px solid transparent; }
+    .sim-step-row .si { font-size: 16px; flex-shrink: 0; }
+    .sim-step-row.current { background: #ecfdf5; border-color: #a7f3d0; font-weight: 600; }
+    .sim-step-row.done { opacity: 0.45; }
+    .sim-log-entry { font-size: 13px; padding: 6px 4px; border-bottom: 1px dashed #e5e7eb; color: #374151; display: flex; gap: 8px; align-items: baseline; }
+    .sim-log-entry .lt { font-weight: 600; }
+    .sim-log-entry .ld { color: #6b7280; }
+    .sim-controls { padding: 14px 24px; border-top: 1px solid #e5e7eb; display: flex; gap: 12px; align-items: center; background: #fff; flex-wrap: wrap; }
+    .sim-controls button { padding: 10px 18px; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; color: white; }
+    .sim-btn-play { background: #005A40; }
+    .sim-btn-pause { background: #F26522; }
+    .sim-btn-stop { background: #ef4444; }
+    .sim-controls button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .sim-speed { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #4b5563; }
+    .sim-speed select { width: auto; padding: 6px 10px; margin: 0; }
   </style>
 </head>
 <body>
@@ -168,6 +195,7 @@
       selectedScriptId: null,
       editingScript: null,
       runVariables: {},
+      sim: null,
       storageEnabled: true,
       commonKeys: ['Tab', 'Enter', 'Escape', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backspace', 'Delete', 'F12'],
 
@@ -571,6 +599,187 @@
       },
 
       // =========================================
+      // SIMULADOR (TESTE SEGURO - NÃO DIGITA NO SISTEMA)
+      // =========================================
+      // Substitui {{VAR}} pelo valor real, igual ao VBS gerado
+      resolveText(text, script) {
+        return (text || '').replace(/\{\{([^}]+)\}\}/g, (m, varId) => {
+          const v = script.variables.find(x => x.id === varId);
+          if (!v) return m;
+          if (v.type === 'date_calc') {
+            const offset = parseInt(v.defaultValue) || 0;
+            const d = new Date();
+            d.setDate(d.getDate() + offset);
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            return `${dd}/${mm}/${d.getFullYear()}`;
+          }
+          let val = this.runVariables[varId] || '';
+          if (v.type === 'date' && val) {
+            const p = val.split('-');
+            if (p.length === 3) val = `${p[2]}/${p[1]}/${p[0]}`;
+          }
+          return val;
+        });
+      },
+
+      describeStep(step, script) {
+        const suffix = step.description ? ` — ${step.description}` : '';
+        if (step.type === 'wait') return { icon: '⏱️', title: 'Esperar', detail: `Aguardar ${step.value} ms${suffix}`, delay: parseInt(step.value) || 0 };
+        if (step.type === 'key') return { icon: '⌨️', title: 'Pressionar tecla', detail: `[${step.value}]${suffix}`, delay: 300 };
+        if (step.type === 'run') return { icon: '🚀', title: 'Abrir programa', detail: `${step.value}${suffix}`, delay: 1000 };
+        if (step.type === 'site') return { icon: '🌐', title: 'Abrir site (Firefox)', detail: `${step.value}${suffix}`, delay: 6000 };
+        if (step.type === 'type') return { icon: '🔤', title: 'Digitar texto', detail: `"${this.resolveText(step.value, script)}"${suffix}`, delay: 500 };
+        return { icon: '•', title: step.type, detail: `${step.value}${suffix}`, delay: 300 };
+      },
+
+      buildSimOps(script) {
+        const stepsExec = [...script.steps].reverse();
+        const hasLoop = script.loop && script.loop.enabled;
+        const count = hasLoop ? (parseInt(script.loop.count) || 1) : 1;
+        const ops = [];
+        for (let c = 1; c <= count; c++) {
+          if (hasLoop) ops.push({ icon: '🔁', title: `Ciclo ${c} de ${count}`, detail: 'Início da repetição', delay: 0 });
+          stepsExec.forEach(step => ops.push(this.describeStep(step, script)));
+        }
+        return ops;
+      },
+
+      openSimulator(scriptId) {
+        const script = this.scripts.find(s => s.id === scriptId);
+        if (!script) return;
+        if (script.steps.length === 0) { alert('Este robô não tem passos para simular.'); return; }
+
+        this.sim = { ops: this.buildSimOps(script), index: 0, running: false, paused: false, timer: null, speed: 1 };
+
+        let overlay = document.getElementById('sim-overlay');
+        if (!overlay) {
+          overlay = document.createElement('div');
+          overlay.id = 'sim-overlay';
+          document.body.appendChild(overlay);
+        }
+        overlay.className = 'sim-overlay';
+        overlay.innerHTML = `
+          <div class="sim-modal">
+            <div class="sim-header">
+              <h3>🧪 Simulação: ${script.name}</h3>
+              <button class="sim-close" onclick="app.closeSimulator()">✖</button>
+            </div>
+            <div class="sim-banner">✅ Modo de teste seguro: nada será digitado no seu computador. Isto apenas mostra o que o robô faria.</div>
+            <div class="sim-body">
+              <div class="sim-steps">
+                <h4>Passos (ordem de execução)</h4>
+                <div id="sim-steps-list">${this.renderSimSteps()}</div>
+              </div>
+              <div class="sim-log">
+                <h4>Registro</h4>
+                <div id="sim-log-list"><div class="sim-log-entry"><span class="ld">Clique em ▶️ Iniciar para começar a simulação.</span></div></div>
+              </div>
+            </div>
+            <div class="sim-controls" id="sim-controls">${this.renderSimControls()}</div>
+          </div>
+        `;
+      },
+
+      renderSimSteps() {
+        return this.sim.ops.map((op, i) => {
+          let cls = 'sim-step-row';
+          if (i < this.sim.index) cls += ' done';
+          if (i === this.sim.index && this.sim.running) cls += ' current';
+          return `<div class="${cls}"><span class="si">${op.icon}</span><span><b>${op.title}</b> <span class="ld">${op.detail}</span></span></div>`;
+        }).join('');
+      },
+
+      renderSimControls() {
+        const s = this.sim;
+        const atEnd = s.index >= s.ops.length;
+        let playLabel = '▶️ Iniciar';
+        if (s.paused) playLabel = '▶️ Continuar';
+        else if (atEnd && !s.running) playLabel = '🔄 Reiniciar';
+        else if (s.index > 0 && !s.running) playLabel = '▶️ Continuar';
+        const playAction = s.paused ? 'app.simResume()' : 'app.simStart()';
+        return `
+          <button class="sim-btn-play" onclick="${playAction}" ${s.running && !s.paused ? 'disabled' : ''}>${playLabel}</button>
+          <button class="sim-btn-pause" onclick="app.simPause()" ${(!s.running || s.paused) ? 'disabled' : ''}>⏸️ Pausar</button>
+          <button class="sim-btn-stop" onclick="app.simStop()" ${(s.index === 0 && !s.running) ? 'disabled' : ''}>⏹️ Parar</button>
+          <div class="sim-speed">
+            <span>Velocidade:</span>
+            <select onchange="app.sim.speed = parseFloat(this.value)">
+              <option value="1" ${s.speed === 1 ? 'selected' : ''}>Tempo real</option>
+              <option value="4" ${s.speed === 4 ? 'selected' : ''}>Rápido (4x)</option>
+              <option value="0" ${s.speed === 0 ? 'selected' : ''}>Instantâneo</option>
+            </select>
+          </div>
+        `;
+      },
+
+      updateSimControls() { const el = document.getElementById('sim-controls'); if (el) el.innerHTML = this.renderSimControls(); },
+      refreshSimSteps() { const el = document.getElementById('sim-steps-list'); if (el) el.innerHTML = this.renderSimSteps(); },
+      simLog(op) {
+        const log = document.getElementById('sim-log-list');
+        if (!log) return;
+        const entry = document.createElement('div');
+        entry.className = 'sim-log-entry';
+        entry.innerHTML = `<span class="si">${op.icon}</span> <span class="lt">${op.title}</span> <span class="ld">${op.detail || ''}</span>`;
+        log.appendChild(entry);
+        log.scrollTop = log.scrollHeight;
+      },
+
+      simStart() {
+        if (!this.sim) return;
+        if (this.sim.index >= this.sim.ops.length) this.sim.index = 0;
+        this.sim.running = true;
+        this.sim.paused = false;
+        this.updateSimControls();
+        this.simNext();
+      },
+      simNext() {
+        if (!this.sim || !this.sim.running || this.sim.paused) return;
+        if (this.sim.index >= this.sim.ops.length) {
+          this.sim.running = false;
+          this.simLog({ icon: '✅', title: 'Simulação concluída', detail: 'Nenhuma tecla foi enviada ao sistema.' });
+          this.refreshSimSteps();
+          this.updateSimControls();
+          return;
+        }
+        const op = this.sim.ops[this.sim.index];
+        this.refreshSimSteps();
+        this.simLog(op);
+        const delay = this.sim.speed === 0 ? 120 : Math.max(120, (op.delay || 200) / this.sim.speed);
+        this.sim.timer = setTimeout(() => { this.sim.index++; this.simNext(); }, delay);
+      },
+      simPause() {
+        if (!this.sim || !this.sim.running) return;
+        this.sim.paused = true;
+        clearTimeout(this.sim.timer);
+        this.simLog({ icon: '⏸️', title: 'Pausado', detail: '' });
+        this.updateSimControls();
+      },
+      simResume() {
+        if (!this.sim || !this.sim.running) return;
+        this.sim.paused = false;
+        this.simLog({ icon: '▶️', title: 'Retomado', detail: '' });
+        this.updateSimControls();
+        this.simNext();
+      },
+      simStop() {
+        if (!this.sim) return;
+        clearTimeout(this.sim.timer);
+        this.sim.running = false;
+        this.sim.paused = false;
+        this.sim.index = 0;
+        this.simLog({ icon: '⏹️', title: 'Parado', detail: 'Simulação reiniciada do começo.' });
+        this.refreshSimSteps();
+        this.updateSimControls();
+      },
+      closeSimulator() {
+        if (this.sim) clearTimeout(this.sim.timer);
+        const o = document.getElementById('sim-overlay');
+        if (o) o.classList.add('hidden');
+        this.sim = null;
+      },
+
+      // =========================================
       // RENDERIZAÇÃO (DOM MANIPULATION)
       // =========================================
       render() {
@@ -652,9 +861,14 @@
             <span style="font-size:24px;">⚠️</span>
             <div>Ao clicar em baixar, um arquivo <strong>.vbs</strong> será salvo. Dê um duplo clique nele para rodar. Você terá 3 segundos para clicar na tela do sistema antes do robô começar a digitar.</div>
           </div>
-          <button class="btn-primary" onclick="app.downloadVBS('${script.id}')">
-            ⬇️ Baixar Arquivo Executável (.vbs)
-          </button>
+          <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+            <button class="btn-success" onclick="app.openSimulator('${script.id}')" style="padding:14px 24px; font-size:15px;">
+              🧪 Testar (Simulação)
+            </button>
+            <button class="btn-primary" onclick="app.downloadVBS('${script.id}')">
+              ⬇️ Baixar Arquivo Executável (.vbs)
+            </button>
+          </div>
         `;
       },
 
