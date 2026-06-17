@@ -490,6 +490,15 @@
       escapeVBSString(text) {
         return (text || '').replace(/"/g, '""').replace(/\r?\n/g, ' ');
       },
+      // Pausas padrão (ms) após cada tipo de ação
+      defaultPause(type) {
+        return type === 'site' ? 6000 : type === 'run' ? 1000 : type === 'type' ? 500 : 300;
+      },
+      // Pausa efetiva de um passo: usa a definida pelo usuário, senão o padrão do tipo
+      stepPause(step) {
+        const p = parseInt(step.pause);
+        return (!isNaN(p) && p >= 0) ? p : this.defaultPause(step.type);
+      },
 
       // Atualizar Variável de Execução
       updateRunVar(id, value) {
@@ -593,10 +602,10 @@
             vbs += `${indent}WScript.Sleep ${step.value} ' ${step.description}\n`;
           } else if (step.type === 'key') {
             vbs += `${indent}WshShell.SendKeys "${this.escapeVBSKey(step.value)}" ' ${step.description}\n`;
-            vbs += `${indent}WScript.Sleep 300\n`;
+            vbs += `${indent}WScript.Sleep ${this.stepPause(step)}\n`;
           } else if (step.type === 'run') {
             vbs += `${indent}WshShell.Run "${step.value.replace(/"/g, '""')}" ' ${step.description}\n`;
-            vbs += `${indent}WScript.Sleep 1000\n`;
+            vbs += `${indent}WScript.Sleep ${this.stepPause(step)}\n`;
           } else if (step.type === 'site') {
             // Abre o endereço no Firefox (caminhos declarados no topo). Se não existir, usa o navegador padrão.
             const url = (step.value || '').replace(/"/g, '""');
@@ -607,7 +616,7 @@
             vbs += `${indent}Else\n`;
             vbs += `${indent}  WshShell.Run """${url}"""\n`;
             vbs += `${indent}End If\n`;
-            vbs += `${indent}WScript.Sleep 6000\n`;
+            vbs += `${indent}WScript.Sleep ${this.stepPause(step)}\n`;
           } else if (step.type === 'type') {
             let text = step.value;
 
@@ -631,7 +640,7 @@
             if (vbsParts.length === 0) vbsParts.push('""');
 
             vbs += `${indent}WshShell.SendKeys ${vbsParts.join(' & ')} ' ${step.description}\n`;
-            vbs += `${indent}WScript.Sleep 500\n`;
+            vbs += `${indent}WScript.Sleep ${this.stepPause(step)}\n`;
           }
 
           // Registra erro do passo, se houver
@@ -690,10 +699,10 @@
       describeStep(step, script) {
         const suffix = step.description ? ` — ${step.description}` : '';
         if (step.type === 'wait') return { icon: '⏱️', title: 'Esperar', detail: `Aguardar ${step.value} ms${suffix}`, delay: parseInt(step.value) || 0 };
-        if (step.type === 'key') return { icon: '⌨️', title: 'Pressionar tecla', detail: `[${step.value}]${suffix}`, delay: 300 };
-        if (step.type === 'run') return { icon: '🚀', title: 'Abrir programa', detail: `${step.value}${suffix}`, delay: 1000 };
-        if (step.type === 'site') return { icon: '🌐', title: 'Abrir site (Firefox)', detail: `${step.value}${suffix}`, delay: 6000 };
-        if (step.type === 'type') return { icon: '🔤', title: 'Digitar texto', detail: `"${this.resolveText(step.value, script)}"${suffix}`, delay: 500 };
+        if (step.type === 'key') return { icon: '⌨️', title: 'Pressionar tecla', detail: `[${step.value}]${suffix}`, delay: this.stepPause(step) };
+        if (step.type === 'run') return { icon: '🚀', title: 'Abrir programa', detail: `${step.value}${suffix}`, delay: this.stepPause(step) };
+        if (step.type === 'site') return { icon: '🌐', title: 'Abrir site (Firefox)', detail: `${step.value}${suffix}`, delay: this.stepPause(step) };
+        if (step.type === 'type') return { icon: '🔤', title: 'Digitar texto', detail: `"${this.resolveText(step.value, script)}"${suffix}`, delay: this.stepPause(step) };
         return { icon: '•', title: step.type, detail: `${step.value}${suffix}`, delay: 300 };
       },
 
@@ -1014,7 +1023,16 @@
               </div>
               <div class="step-content">
                 <div>${inputHtml}</div>
-                <div><input type="text" value="${s.description}" oninput="app.updateStep('${s.id}', 'description', this.value)" placeholder="Descrição (ex: Clica no botão)"></div>
+                <div>
+                  <input type="text" value="${s.description}" oninput="app.updateStep('${s.id}', 'description', this.value)" placeholder="Descrição (ex: Clica no botão)">
+                  ${s.type !== 'wait' ? `
+                    <div style="display:flex; align-items:center; gap:6px; margin-top:8px;">
+                      <span style="font-size:11px; color:#6b7280; white-space:nowrap;" title="Tempo que o robô aguarda DEPOIS desta ação antes de seguir. Aumente se a tela/lista não acompanha.">⏳ Pausa após:</span>
+                      <input type="number" min="0" value="${this.stepPause(s)}" onchange="app.updateStep('${s.id}', 'pause', this.value)" style="width:90px; padding:6px;">
+                      <span style="font-size:11px; color:#6b7280;">ms</span>
+                    </div>
+                  ` : ''}
+                </div>
               </div>
               <div style="display:flex; flex-direction:column; gap:6px;">
                 <button class="step-remove" onclick="app.duplicateStep('${s.id}')" title="Duplicar etapa" style="color:#005A40;">⧉</button>
