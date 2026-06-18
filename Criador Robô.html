@@ -201,32 +201,68 @@
       storageEnabled: true,
       commonKeys: ['Tab', 'Enter', 'Escape', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backspace', 'Delete', 'F12'],
 
-      // Inicialização com Proteção
+      // =========================================
+      // CAMADA DE ARMAZENAMENTO
+      // Usa a Planilha Google quando servido pelo GAS;
+      // cai para o localStorage quando aberto como arquivo local.
+      // =========================================
+      storage: {
+        isGAS() {
+          return (typeof google !== 'undefined' && google.script && google.script.run);
+        },
+        load(onDone) {
+          if (this.isGAS()) {
+            google.script.run
+              .withSuccessHandler(function (data) { onDone(data || [], null); })
+              .withFailureHandler(function (err) { onDone(null, err); })
+              .getRobots();
+          } else {
+            try {
+              const saved = localStorage.getItem('cresol_rpa_offline_v7');
+              onDone(saved ? JSON.parse(saved) : [], null);
+            } catch (e) { onDone(null, e); }
+          }
+        },
+        save(scripts, onDone, onError) {
+          if (this.isGAS()) {
+            google.script.run
+              .withSuccessHandler(function () { if (onDone) onDone(); })
+              .withFailureHandler(function (err) { if (onError) onError(err); })
+              .saveAll(scripts);
+          } else {
+            try {
+              localStorage.setItem('cresol_rpa_offline_v7', JSON.stringify(scripts));
+              if (onDone) onDone();
+            } catch (e) { if (onError) onError(e); }
+          }
+        }
+      },
+
+      // Inicialização com Proteção (assíncrona: dados podem vir da planilha)
       init() {
-        try {
-          const saved = localStorage.getItem('cresol_rpa_offline_v7');
-          if (saved) {
-            this.scripts = JSON.parse(saved);
+        this.render();
+        this.storage.load((data, error) => {
+          if (error) {
+            this.storageEnabled = false;
+            const w = document.getElementById('storage-warning');
+            if (w) w.style.display = 'block';
+          } else {
+            this.scripts = data || [];
             if (this.scripts.length > 0) {
               this.selectedScriptId = this.scripts[0].id;
               this.initRunVariables();
             }
           }
-        } catch (error) {
-          this.storageEnabled = false;
-          document.getElementById('storage-warning').style.display = 'block';
-        }
-        this.render();
+          this.render();
+        });
       },
 
-      // Salvar no navegador
+      // Salvar (planilha no GAS, ou navegador localmente)
       save() {
         if (!this.storageEnabled) return;
-        try {
-          localStorage.setItem('cresol_rpa_offline_v7', JSON.stringify(this.scripts));
-        } catch (error) {
-          console.warn("Não foi possível salvar no navegador.");
-        }
+        this.storage.save(this.scripts, null, (error) => {
+          console.warn("Não foi possível salvar.", error);
+        });
       },
 
       // =========================================
