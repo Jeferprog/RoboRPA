@@ -804,6 +804,45 @@
         a.click();
         URL.revokeObjectURL(url);
       },
+      // Anti-ocioso AVULSO: roda sozinho e mantém a máquina ativa por X horas.
+      // Útil para deixar o PC acordado até a hora de um robô agendado.
+      downloadAntiIdle() {
+        let vbs = `' ==========================================\n`;
+        vbs += `' Anti-ocioso avulso - Cresol RPA\n`;
+        vbs += `' Mantem o computador ATIVO (evita bloqueio por inatividade).\n`;
+        vbs += `' Envia a tecla neutra F15 de tempos em tempos: NAO digita nada,\n`;
+        vbs += `' nao muda o foco. Para sozinho ao fim do tempo escolhido.\n`;
+        vbs += `' ==========================================\n`;
+        vbs += `Option Explicit\n`;
+        vbs += `Dim WshShell, resp, horas, intervaloSeg, fimEm\n`;
+        vbs += `Set WshShell = CreateObject("WScript.Shell")\n\n`;
+        vbs += `' Pergunta por quantas horas manter o computador ativo (padrao 12)\n`;
+        vbs += `resp = InputBox("Por quantas HORAS manter o computador ativo?" & vbCrLf & vbCrLf & _\n`;
+        vbs += `  "Ex.: para deixar a noite toda ate o robo rodar de manha, use 12 ou 14." & vbCrLf & _\n`;
+        vbs += `  "O anti-ocioso para sozinho ao fim do tempo.", "Anti-ocioso - Cresol RPA", "12")\n\n`;
+        vbs += `If resp = "" Then WScript.Quit ' usuario cancelou\n`;
+        vbs += `If Not IsNumeric(resp) Then resp = "12"\n`;
+        vbs += `horas = CDbl(resp)\n`;
+        vbs += `If horas <= 0 Then horas = 12\n\n`;
+        vbs += `intervaloSeg = 50 ' envia F15 a cada 50 segundos\n`;
+        vbs += `fimEm = DateAdd("h", horas, Now)\n\n`;
+        vbs += `WshShell.Popup "Anti-ocioso LIGADO ate " & FormatDateTime(fimEm) & "." & vbCrLf & _\n`;
+        vbs += `  "Pode minimizar esta janela. Para parar antes, encerre 'wscript.exe'" & vbCrLf & _\n`;
+        vbs += `  "no Gerenciador de Tarefas.", 8, "Anti-ocioso - Cresol RPA", 64\n\n`;
+        vbs += `Do While Now < fimEm\n`;
+        vbs += `  WScript.Sleep intervaloSeg * 1000\n`;
+        vbs += `  WshShell.SendKeys "{F15}" ' tecla neutra: so evita a ociosidade\n`;
+        vbs += `Loop\n\n`;
+        vbs += `WshShell.Popup "Anti-ocioso finalizado. O computador volta ao normal.", 6, "Anti-ocioso - Cresol RPA", 64\n`;
+
+        const blob = new Blob([vbs], { type: 'text/vbs;charset=windows-1252' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'anti_ocioso.vbs';
+        a.click();
+        URL.revokeObjectURL(url);
+      },
       downloadScheduler(id) {
         const script = this.scripts.find(s => s.id === id);
         if (!script) return;
@@ -1203,6 +1242,22 @@
             </div>
             <div style="font-size:12px; color:#6b7280; margin-top:14px; line-height:1.5;">
               <strong>Como usar:</strong> 1) Baixe o <strong>.vbs</strong> do robô (botão acima). 2) Salve o <strong>.bat</strong> na <strong>mesma pasta</strong> do .vbs. 3) Dê um <strong>duplo clique no .bat</strong> para criar o agendamento no Windows. Para desfazer, use o cancelador.
+            </div>
+
+            <div style="margin-top:24px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:16px;">
+              <div style="font-weight:bold; color:#1e40af; margin-bottom:8px;">☕ Manter o computador ativo até a hora do robô</div>
+              <div style="font-size:13px; color:#1e3a8a; line-height:1.6; margin-bottom:14px;">
+                Agendou o robô para amanhã de manhã, mas o PC bloqueia por inatividade durante a noite?
+                Baixe o <strong>anti-ocioso avulso</strong> e deixe rodando. Ele só envia a tecla neutra
+                <strong>F15</strong> de tempos em tempos — <strong>não digita nada</strong> e <strong>para sozinho</strong>
+                no tempo que você escolher. Ao abrir, ele pergunta <strong>por quantas horas</strong> manter ativo.
+              </div>
+              <button class="btn-primary" onclick="app.downloadAntiIdle()">⬇️ Baixar Anti-ocioso (.vbs)</button>
+              <div style="font-size:12px; color:#6b7280; margin-top:12px; line-height:1.5;">
+                <strong>Como usar:</strong> dê um duplo clique no arquivo, informe quantas horas (ex.: 12),
+                e deixe-o aberto. Para parar antes, encerre <strong>wscript.exe</strong> no Gerenciador de Tarefas.
+                É independente do robô — pode rodar em qualquer máquina.
+              </div>
             </div>
           </div>
         `;
