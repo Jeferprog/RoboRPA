@@ -197,6 +197,7 @@
       runVariables: {},
       sim: null,
       debugMode: false,
+      unattendedMode: false,
       storageEnabled: true,
       commonKeys: ['Tab', 'Enter', 'Escape', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backspace', 'Delete', 'F12'],
 
@@ -565,8 +566,14 @@
           vbs += `' ----------------------------------\n\n`;
         }
 
-        vbs += `MsgBox "O robô vai começar em 3 segundos. Clique na tela do sistema agora!", 64, "Aviso"\n`;
-        vbs += `WScript.Sleep 3000\n\n`;
+        if (this.unattendedMode) {
+          // Modo desassistido: aviso some sozinho em 3s, não espera clique (ideal para agendamento)
+          vbs += `' Modo desassistido: contagem automática, sem precisar clicar\n`;
+          vbs += `WshShell.Popup "O robô vai começar em 3 segundos...", 3, "Cresol RPA", 64\n\n`;
+        } else {
+          vbs += `MsgBox "O robô vai começar em 3 segundos. Clique na tela do sistema agora!", 64, "Aviso"\n`;
+          vbs += `WScript.Sleep 3000\n\n`;
+        }
 
         // Executa os passos na ordem inversa (do último adicionado para o primeiro)
         const stepsToExecute = [...script.steps].reverse();
@@ -660,7 +667,11 @@
           vbs += `WshShell.Run "notepad.exe """ & dbgPath & """", 1, False\n`;
         }
 
-        vbs += `\nMsgBox "Robô finalizado com sucesso!", 64, "Aviso"`;
+        if (this.unattendedMode) {
+          vbs += `\nWshShell.Popup "Robô finalizado com sucesso!", 3, "Cresol RPA", 64`;
+        } else {
+          vbs += `\nMsgBox "Robô finalizado com sucesso!", 64, "Aviso"`;
+        }
 
         const blob = new Blob([vbs], { type: 'text/vbs;charset=windows-1252' });
         const url = URL.createObjectURL(blob);
@@ -1064,6 +1075,12 @@
             <input type="checkbox" id="debug-checkbox" ${this.debugMode ? 'checked' : ''} onchange="app.debugMode = this.checked" style="width:auto; margin-top:3px;">
             <label for="debug-checkbox" style="font-size:13px; color:#92400e; cursor:pointer;">
               🐞 <strong>Modo depuração</strong> — gera um <strong>log de cada passo</strong> (com data/hora) na Área de Trabalho e <strong>narra os passos em voz</strong>, para você identificar exatamente onde o robô errou. O log abre no Bloco de Notas ao final.
+            </label>
+          </div>
+          <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:16px; background:#ecfdf5; border:1px solid #a7f3d0; padding:12px; border-radius:8px;">
+            <input type="checkbox" id="unattended-checkbox" ${this.unattendedMode ? 'checked' : ''} onchange="app.unattendedMode = this.checked" style="width:auto; margin-top:3px;">
+            <label for="unattended-checkbox" style="font-size:13px; color:#065f46; cursor:pointer;">
+              🤖 <strong>Modo desassistido</strong> (para agendamento) — troca os avisos que esperam clique por uma <strong>contagem automática</strong>, para o robô rodar sozinho. Ideal quando o próprio robô abre a janela (ex.: <strong>Abrir Site no Firefox</strong>), pois ela já fica em foco.
             </label>
           </div>
           <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
