@@ -196,35 +196,73 @@
       editingScript: null,
       runVariables: {},
       sim: null,
+      debugMode: false,
+      unattendedMode: false,
       storageEnabled: true,
       commonKeys: ['Tab', 'Enter', 'Escape', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backspace', 'Delete', 'F12'],
 
-      // Inicialização com Proteção
+      // =========================================
+      // CAMADA DE ARMAZENAMENTO
+      // Usa a Planilha Google quando servido pelo GAS;
+      // cai para o localStorage quando aberto como arquivo local.
+      // =========================================
+      storage: {
+        isGAS() {
+          return (typeof google !== 'undefined' && google.script && google.script.run);
+        },
+        load(onDone) {
+          if (this.isGAS()) {
+            google.script.run
+              .withSuccessHandler(function (data) { onDone(data || [], null); })
+              .withFailureHandler(function (err) { onDone(null, err); })
+              .getRobots();
+          } else {
+            try {
+              const saved = localStorage.getItem('cresol_rpa_offline_v7');
+              onDone(saved ? JSON.parse(saved) : [], null);
+            } catch (e) { onDone(null, e); }
+          }
+        },
+        save(scripts, onDone, onError) {
+          if (this.isGAS()) {
+            google.script.run
+              .withSuccessHandler(function () { if (onDone) onDone(); })
+              .withFailureHandler(function (err) { if (onError) onError(err); })
+              .saveAll(scripts);
+          } else {
+            try {
+              localStorage.setItem('cresol_rpa_offline_v7', JSON.stringify(scripts));
+              if (onDone) onDone();
+            } catch (e) { if (onError) onError(e); }
+          }
+        }
+      },
+
+      // Inicialização com Proteção (assíncrona: dados podem vir da planilha)
       init() {
-        try {
-          const saved = localStorage.getItem('cresol_rpa_offline_v7');
-          if (saved) {
-            this.scripts = JSON.parse(saved);
+        this.render();
+        this.storage.load((data, error) => {
+          if (error) {
+            this.storageEnabled = false;
+            const w = document.getElementById('storage-warning');
+            if (w) w.style.display = 'block';
+          } else {
+            this.scripts = data || [];
             if (this.scripts.length > 0) {
               this.selectedScriptId = this.scripts[0].id;
               this.initRunVariables();
             }
           }
-        } catch (error) {
-          this.storageEnabled = false;
-          document.getElementById('storage-warning').style.display = 'block';
-        }
-        this.render();
+          this.render();
+        });
       },
 
-      // Salvar no navegador
+      // Salvar (planilha no GAS, ou navegador localmente)
       save() {
         if (!this.storageEnabled) return;
-        try {
-          localStorage.setItem('cresol_rpa_offline_v7', JSON.stringify(this.scripts));
-        } catch (error) {
-          console.warn("Não foi possível salvar no navegador.");
-        }
+        this.storage.save(this.scripts, null, (error) => {
+          console.warn("Não foi possível salvar.", error);
+        });
       },
 
       // =========================================
@@ -410,6 +448,15 @@
         this.editingScript.steps = this.editingScript.steps.filter(s => s.id !== id);
         this.renderCreator();
       },
+      duplicateStep(id) {
+        const index = this.editingScript.steps.findIndex(s => s.id === id);
+        if (index < 0) return;
+        const copy = JSON.parse(JSON.stringify(this.editingScript.steps[index]));
+        copy.id = this.generateId();
+        // Insere a cópia logo abaixo do original na lista
+        this.editingScript.steps.splice(index + 1, 0, copy);
+        this.renderCreator();
+      },
       updateStep(id, field, value) {
         const s = this.editingScript.steps.find(x => x.id === id);
         if (s) s[field] = value;
@@ -476,6 +523,19 @@
         };
         return keyMap[key] || `{${key}}`;
       },
+      // Escapa texto para ficar dentro de "aspas" numa string literal do VBScript (log)
+      escapeVBSString(text) {
+        return (text || '').replace(/"/g, '""').replace(/\r?\n/g, ' ');
+      },
+      // Pausas padrão (ms) após cada tipo de ação
+      defaultPause(type) {
+        return type === 'site' ? 6000 : type === 'run' ? 1000 : type === 'type' ? 500 : 300;
+      },
+      // Pausa efetiva de um passo: usa a definida pelo usuário, senão o padrão do tipo
+      stepPause(step) {
+        const p = parseInt(step.pause);
+        return (!isNaN(p) && p >= 0) ? p : this.defaultPause(step.type);
+      },
 
       // Atualizar Variável de Execução
       updateRunVar(id, value) {
@@ -486,13 +546,38 @@
       downloadVBS(id) {
         const script = this.scripts.find(s => s.id === id);
         if (!script) return;
+        const debug = this.debugMode;
 
         let vbs = `' ==========================================\n`;
         vbs += `' Robô: ${script.name}\n`;
         vbs += `' Descrição: ${script.description}\n`;
         vbs += `' Gerado pelo Cresol RPA Web\n`;
         vbs += `' ==========================================\n\n`;
-        vbs += `Set WshShell = WScript.CreateObject("WScript.Shell")\n\n`;
+        vbs += `Set WshShell = WScript.CreateObject("WScript.Shell")\n`;
+
+        // Declarações globais para o passo "site" (uma só vez, evita Dim duplicado)
+        const hasSite = script.steps.some(s => s.type === 'site');
+        if (hasSite) {
+          vbs += `Dim ffFso, ff64, ff32\n`;
+          vbs += `Set ffFso = CreateObject("Scripting.FileSystemObject")\n`;
+          vbs += `ff64 = "C:\\Program Files\\Mozilla Firefox\\firefox.exe"\n`;
+          vbs += `ff32 = "C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe"\n`;
+        }
+
+        // --- Modo Depuração: log em arquivo + narração em voz ---
+        if (debug) {
+          vbs += `\n' --- Modo Depuração ---\n`;
+          vbs += `Dim dbgFso, dbgLog, dbgPath, dbgVoice, dbgStep\n`;
+          vbs += `Set dbgFso = CreateObject("Scripting.FileSystemObject")\n`;
+          vbs += `dbgPath = WshShell.SpecialFolders("Desktop") & "\\log_robo_${script.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt"\n`;
+          vbs += `Set dbgLog = dbgFso.CreateTextFile(dbgPath, True)\n`;
+          vbs += `dbgStep = 0\n`;
+          vbs += `On Error Resume Next\n`;
+          vbs += `Set dbgVoice = CreateObject("SAPI.SpVoice")\n`;
+          vbs += `On Error GoTo 0\n`;
+          vbs += `dbgLog.WriteLine Now & " - INICIO do robo: ${this.escapeVBSString(script.name)}"\n`;
+        }
+        vbs += `\n`;
 
         // Declarar e inicializar variáveis no VBScript
         if (script.variables.length > 0) {
@@ -512,15 +597,25 @@
               }
               vbs += `${v.id} = "${this.escapeVBSText(val)}"\n`;
             }
+            if (debug) vbs += `dbgLog.WriteLine "   Variavel ${v.id} = " & ${v.id}\n`;
           });
           vbs += `' ----------------------------------\n\n`;
         }
 
-        vbs += `MsgBox "O robô vai começar em 3 segundos. Clique na tela do sistema agora!", 64, "Aviso"\n`;
-        vbs += `WScript.Sleep 3000\n\n`;
+        if (this.unattendedMode) {
+          // Modo desassistido: aviso some sozinho em 3s, não espera clique (ideal para agendamento)
+          vbs += `' Modo desassistido: contagem automática, sem precisar clicar\n`;
+          vbs += `WshShell.Popup "O robô vai começar em 3 segundos...", 3, "Cresol RPA", 64\n\n`;
+        } else {
+          vbs += `MsgBox "O robô vai começar em 3 segundos. Clique na tela do sistema agora!", 64, "Aviso"\n`;
+          vbs += `WScript.Sleep 3000\n\n`;
+        }
 
         // Executa os passos na ordem inversa (do último adicionado para o primeiro)
         const stepsToExecute = [...script.steps].reverse();
+
+        // Em depuração, segue mesmo se um passo falhar, para registrar o erro no log
+        if (debug) vbs += `On Error Resume Next\n`;
 
         // Lógica de Loop
         const hasLoop = script.loop && script.loop.enabled;
@@ -528,37 +623,46 @@
           vbs += `Dim loopCount\n`;
           vbs += `For loopCount = 1 To ${script.loop.count}\n`;
           vbs += `  ' --- Início da Repetição (Ciclo ' & loopCount & ') ---\n`;
+          if (debug) {
+            vbs += `  dbgStep = 0\n`;
+            vbs += `  dbgLog.WriteLine Now & " - === Ciclo " & loopCount & " ==="\n`;
+          }
         }
 
         stepsToExecute.forEach(step => {
           let indent = hasLoop ? '  ' : '';
+
+          // Registro/narração antes de executar o passo (não rouba o foco da tela)
+          if (debug) {
+            const d = this.describeStep(step, script);
+            const label = this.escapeVBSString(`${d.title}: ${d.detail}`);
+            vbs += `${indent}dbgStep = dbgStep + 1\n`;
+            vbs += `${indent}dbgLog.WriteLine Now & " - PASSO " & dbgStep & ": ${label}"\n`;
+            vbs += `${indent}If Not (dbgVoice Is Nothing) Then dbgVoice.Speak "Passo " & dbgStep, 1\n`;
+          }
+
           if (step.type === 'wait') {
             vbs += `${indent}WScript.Sleep ${step.value} ' ${step.description}\n`;
           } else if (step.type === 'key') {
             vbs += `${indent}WshShell.SendKeys "${this.escapeVBSKey(step.value)}" ' ${step.description}\n`;
-            vbs += `${indent}WScript.Sleep 300\n`;
+            vbs += `${indent}WScript.Sleep ${this.stepPause(step)}\n`;
           } else if (step.type === 'run') {
             vbs += `${indent}WshShell.Run "${step.value.replace(/"/g, '""')}" ' ${step.description}\n`;
-            vbs += `${indent}WScript.Sleep 1000\n`;
+            vbs += `${indent}WScript.Sleep ${this.stepPause(step)}\n`;
           } else if (step.type === 'site') {
-            // Abre o endereço no Firefox. Tenta o caminho padrão (64 e 32 bits) e,
-            // se não existir, usa o navegador padrão do sistema.
+            // Abre o endereço no Firefox (caminhos declarados no topo). Se não existir, usa o navegador padrão.
             const url = (step.value || '').replace(/"/g, '""');
-            vbs += `${indent}Dim ff64, ff32 ' ${step.description}\n`;
-            vbs += `${indent}ff64 = "C:\\Program Files\\Mozilla Firefox\\firefox.exe"\n`;
-            vbs += `${indent}ff32 = "C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe"\n`;
-            vbs += `${indent}Dim fso : Set fso = CreateObject("Scripting.FileSystemObject")\n`;
-            vbs += `${indent}If fso.FileExists(ff64) Then\n`;
+            vbs += `${indent}If ffFso.FileExists(ff64) Then ' ${step.description}\n`;
             vbs += `${indent}  WshShell.Run """" & ff64 & """ -new-window ""${url}"""\n`;
-            vbs += `${indent}ElseIf fso.FileExists(ff32) Then\n`;
+            vbs += `${indent}ElseIf ffFso.FileExists(ff32) Then\n`;
             vbs += `${indent}  WshShell.Run """" & ff32 & """ -new-window ""${url}"""\n`;
             vbs += `${indent}Else\n`;
             vbs += `${indent}  WshShell.Run """${url}"""\n`;
             vbs += `${indent}End If\n`;
-            vbs += `${indent}WScript.Sleep 6000\n`;
+            vbs += `${indent}WScript.Sleep ${this.stepPause(step)}\n`;
           } else if (step.type === 'type') {
             let text = step.value;
-            
+
             // Injetar variáveis dinamicamente no VBScript
             let parts = text.split(/\{\{([^}]+)\}\}/);
             let vbsParts = [];
@@ -579,7 +683,12 @@
             if (vbsParts.length === 0) vbsParts.push('""');
 
             vbs += `${indent}WshShell.SendKeys ${vbsParts.join(' & ')} ' ${step.description}\n`;
-            vbs += `${indent}WScript.Sleep 500\n`;
+            vbs += `${indent}WScript.Sleep ${this.stepPause(step)}\n`;
+          }
+
+          // Registra erro do passo, se houver
+          if (debug) {
+            vbs += `${indent}If Err.Number <> 0 Then dbgLog.WriteLine "   >> ERRO no passo " & dbgStep & ": " & Err.Description : Err.Clear\n`;
           }
         });
 
@@ -587,7 +696,18 @@
           vbs += `Next\n`;
         }
 
-        vbs += `\nMsgBox "Robô finalizado com sucesso!", 64, "Aviso"`;
+        if (debug) {
+          vbs += `On Error GoTo 0\n`;
+          vbs += `dbgLog.WriteLine Now & " - FIM do robo"\n`;
+          vbs += `dbgLog.Close\n`;
+          vbs += `WshShell.Run "notepad.exe """ & dbgPath & """", 1, False\n`;
+        }
+
+        if (this.unattendedMode) {
+          vbs += `\nWshShell.Popup "Robô finalizado com sucesso!", 3, "Cresol RPA", 64`;
+        } else {
+          vbs += `\nMsgBox "Robô finalizado com sucesso!", 64, "Aviso"`;
+        }
 
         const blob = new Blob([vbs], { type: 'text/vbs;charset=windows-1252' });
         const url = URL.createObjectURL(blob);
@@ -596,6 +716,132 @@
         a.download = `${script.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.vbs`;
         a.click();
         URL.revokeObjectURL(url);
+      },
+
+      // =========================================
+      // AGENDADOR (Windows Task Scheduler via .bat)
+      // =========================================
+      safeFileName(name) {
+        return name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      },
+      scheduleExtraHtml(freq) {
+        if (freq === 'ONCE') {
+          const today = new Date().toISOString().split('T')[0];
+          return `<div class="form-group" style="margin:0;"><label>Data</label><input type="date" id="sch-date" value="${today}"></div>`;
+        }
+        if (freq === 'WEEKLY') {
+          return `<div class="form-group" style="margin:0;"><label>Dia da semana</label>
+            <select id="sch-weekday">
+              <option value="MON">Segunda-feira</option>
+              <option value="TUE">Terça-feira</option>
+              <option value="WED">Quarta-feira</option>
+              <option value="THU">Quinta-feira</option>
+              <option value="FRI">Sexta-feira</option>
+              <option value="SAT">Sábado</option>
+              <option value="SUN">Domingo</option>
+            </select></div>`;
+        }
+        return `<div style="font-size:13px; color:#6b7280; padding-bottom:10px;">Vai rodar todos os dias no horário escolhido.</div>`;
+      },
+      renderScheduleFields() {
+        const freq = document.getElementById('sch-freq').value;
+        document.getElementById('sch-extra').innerHTML = this.scheduleExtraHtml(freq);
+      },
+      // Converte AAAA-MM-DD para DD/MM/AAAA (formato esperado pelo schtasks em pt-BR)
+      isoToBrDate(iso) {
+        const p = (iso || '').split('-');
+        return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
+      },
+      downloadBat(fileName, content) {
+        const blob = new Blob([content.replace(/\n/g, '\r\n')], { type: 'application/bat;charset=windows-1252' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      downloadScheduler(id) {
+        const script = this.scripts.find(s => s.id === id);
+        if (!script) return;
+
+        const safe = this.safeFileName(script.name);
+        const taskName = `CresolRPA_${safe}`;
+        const time = (document.getElementById('sch-time').value || '08:00');
+        const freq = document.getElementById('sch-freq').value;
+
+        let flags = '';
+        let descricao = '';
+        const weekdayPt = { MON: 'segunda', TUE: 'terca', WED: 'quarta', THU: 'quinta', FRI: 'sexta', SAT: 'sabado', SUN: 'domingo' };
+
+        if (freq === 'ONCE') {
+          const dateIso = document.getElementById('sch-date').value;
+          if (!dateIso) { alert('Escolha a data para o agendamento "Uma vez".'); return; }
+          const brDate = this.isoToBrDate(dateIso);
+          flags = `/sc ONCE /sd ${brDate} /st ${time}`;
+          descricao = `uma vez em ${brDate} as ${time}`;
+        } else if (freq === 'DAILY') {
+          flags = `/sc DAILY /st ${time}`;
+          descricao = `todos os dias as ${time}`;
+        } else if (freq === 'WEEKLY') {
+          const wd = document.getElementById('sch-weekday').value;
+          flags = `/sc WEEKLY /d ${wd} /st ${time}`;
+          descricao = `toda ${weekdayPt[wd]} as ${time}`;
+        }
+
+        // .bat: textos sem acentos para evitar problemas de codificacao no console
+        let bat = '';
+        bat += `@echo off\n`;
+        bat += `chcp 1252 >nul\n`;
+        bat += `title Agendador Cresol RPA\n`;
+        bat += `echo ============================================\n`;
+        bat += `echo  Agendador do robo: ${safe}\n`;
+        bat += `echo ============================================\n`;
+        bat += `echo.\n`;
+        bat += `set "ROBO=%~dp0${safe}.vbs"\n`;
+        bat += `if not exist "%ROBO%" (\n`;
+        bat += `  echo [ERRO] Arquivo do robo nao encontrado:\n`;
+        bat += `  echo    %ROBO%\n`;
+        bat += `  echo.\n`;
+        bat += `  echo Coloque este .bat na MESMA pasta do arquivo .vbs do robo.\n`;
+        bat += `  echo.\n`;
+        bat += `  pause\n`;
+        bat += `  exit /b 1\n`;
+        bat += `)\n`;
+        bat += `schtasks /create /tn "${taskName}" /tr "wscript.exe \\"%ROBO%\\"" ${flags} /f\n`;
+        bat += `if %errorlevel%==0 (\n`;
+        bat += `  echo.\n`;
+        bat += `  echo [OK] Agendamento criado com sucesso.\n`;
+        bat += `  echo O robo vai rodar ${descricao}.\n`;
+        bat += `) else (\n`;
+        bat += `  echo.\n`;
+        bat += `  echo [ERRO] Nao foi possivel criar o agendamento.\n`;
+        bat += `)\n`;
+        bat += `echo.\n`;
+        bat += `pause\n`;
+
+        this.downloadBat(`agendar_${safe}.bat`, bat);
+      },
+      downloadUnscheduler(id) {
+        const script = this.scripts.find(s => s.id === id);
+        if (!script) return;
+        const safe = this.safeFileName(script.name);
+        const taskName = `CresolRPA_${safe}`;
+
+        let bat = '';
+        bat += `@echo off\n`;
+        bat += `chcp 1252 >nul\n`;
+        bat += `title Cancelar Agendamento Cresol RPA\n`;
+        bat += `schtasks /delete /tn "${taskName}" /f\n`;
+        bat += `if %errorlevel%==0 (\n`;
+        bat += `  echo [OK] Agendamento removido.\n`;
+        bat += `) else (\n`;
+        bat += `  echo [AVISO] Nenhum agendamento encontrado com esse nome.\n`;
+        bat += `)\n`;
+        bat += `echo.\n`;
+        bat += `pause\n`;
+
+        this.downloadBat(`cancelar_${safe}.bat`, bat);
       },
 
       // =========================================
@@ -626,10 +872,10 @@
       describeStep(step, script) {
         const suffix = step.description ? ` — ${step.description}` : '';
         if (step.type === 'wait') return { icon: '⏱️', title: 'Esperar', detail: `Aguardar ${step.value} ms${suffix}`, delay: parseInt(step.value) || 0 };
-        if (step.type === 'key') return { icon: '⌨️', title: 'Pressionar tecla', detail: `[${step.value}]${suffix}`, delay: 300 };
-        if (step.type === 'run') return { icon: '🚀', title: 'Abrir programa', detail: `${step.value}${suffix}`, delay: 1000 };
-        if (step.type === 'site') return { icon: '🌐', title: 'Abrir site (Firefox)', detail: `${step.value}${suffix}`, delay: 6000 };
-        if (step.type === 'type') return { icon: '🔤', title: 'Digitar texto', detail: `"${this.resolveText(step.value, script)}"${suffix}`, delay: 500 };
+        if (step.type === 'key') return { icon: '⌨️', title: 'Pressionar tecla', detail: `[${step.value}]${suffix}`, delay: this.stepPause(step) };
+        if (step.type === 'run') return { icon: '🚀', title: 'Abrir programa', detail: `${step.value}${suffix}`, delay: this.stepPause(step) };
+        if (step.type === 'site') return { icon: '🌐', title: 'Abrir site (Firefox)', detail: `${step.value}${suffix}`, delay: this.stepPause(step) };
+        if (step.type === 'type') return { icon: '🔤', title: 'Digitar texto', detail: `"${this.resolveText(step.value, script)}"${suffix}`, delay: this.stepPause(step) };
         return { icon: '•', title: step.type, detail: `${step.value}${suffix}`, delay: 300 };
       },
 
@@ -861,6 +1107,18 @@
             <span style="font-size:24px;">⚠️</span>
             <div>Ao clicar em baixar, um arquivo <strong>.vbs</strong> será salvo. Dê um duplo clique nele para rodar. Você terá 3 segundos para clicar na tela do sistema antes do robô começar a digitar.</div>
           </div>
+          <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:16px; background:#fffbeb; border:1px solid #fde68a; padding:12px; border-radius:8px;">
+            <input type="checkbox" id="debug-checkbox" ${this.debugMode ? 'checked' : ''} onchange="app.debugMode = this.checked" style="width:auto; margin-top:3px;">
+            <label for="debug-checkbox" style="font-size:13px; color:#92400e; cursor:pointer;">
+              🐞 <strong>Modo depuração</strong> — gera um <strong>log de cada passo</strong> (com data/hora) na Área de Trabalho e <strong>narra os passos em voz</strong>, para você identificar exatamente onde o robô errou. O log abre no Bloco de Notas ao final.
+            </label>
+          </div>
+          <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:16px; background:#ecfdf5; border:1px solid #a7f3d0; padding:12px; border-radius:8px;">
+            <input type="checkbox" id="unattended-checkbox" ${this.unattendedMode ? 'checked' : ''} onchange="app.unattendedMode = this.checked" style="width:auto; margin-top:3px;">
+            <label for="unattended-checkbox" style="font-size:13px; color:#065f46; cursor:pointer;">
+              🤖 <strong>Modo desassistido</strong> (para agendamento) — troca os avisos que esperam clique por uma <strong>contagem automática</strong>, para o robô rodar sozinho. Ideal quando o próprio robô abre a janela (ex.: <strong>Abrir Site no Firefox</strong>), pois ela já fica em foco.
+            </label>
+          </div>
           <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
             <button class="btn-success" onclick="app.openSimulator('${script.id}')" style="padding:14px 24px; font-size:15px;">
               🧪 Testar (Simulação)
@@ -868,6 +1126,35 @@
             <button class="btn-primary" onclick="app.downloadVBS('${script.id}')">
               ⬇️ Baixar Arquivo Executável (.vbs)
             </button>
+          </div>
+
+          <div class="variables-section" style="margin-top:32px;">
+            <div class="variables-title">⏰ Agendar execução automática</div>
+            <div style="font-size:13px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; padding:10px 12px; border-radius:8px; margin-bottom:20px;">
+              ⚠️ No horário marcado o computador precisa estar <strong>ligado e desbloqueado</strong>, com a <strong>janela do sistema aberta</strong>. Como na execução manual, o robô digita na janela em foco — então o agendamento serve para <strong>iniciar o robô na hora certa</strong>, com você presente.
+            </div>
+            <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
+              <div class="form-group" style="margin:0; flex:1; min-width:160px;">
+                <label>Frequência</label>
+                <select id="sch-freq" onchange="app.renderScheduleFields()">
+                  <option value="ONCE">Uma vez</option>
+                  <option value="DAILY">Todos os dias</option>
+                  <option value="WEEKLY">Toda semana</option>
+                </select>
+              </div>
+              <div id="sch-extra" style="flex:1; min-width:160px;">${this.scheduleExtraHtml('ONCE')}</div>
+              <div class="form-group" style="margin:0; min-width:120px;">
+                <label>Horário</label>
+                <input type="time" id="sch-time" value="08:00">
+              </div>
+            </div>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:20px;">
+              <button class="btn-success" onclick="app.downloadScheduler('${script.id}')">📅 Gerar agendador (.bat)</button>
+              <button class="btn-outline" onclick="app.downloadUnscheduler('${script.id}')">🗑️ Gerar cancelador (.bat)</button>
+            </div>
+            <div style="font-size:12px; color:#6b7280; margin-top:14px; line-height:1.5;">
+              <strong>Como usar:</strong> 1) Baixe o <strong>.vbs</strong> do robô (botão acima). 2) Salve o <strong>.bat</strong> na <strong>mesma pasta</strong> do .vbs. 3) Dê um <strong>duplo clique no .bat</strong> para criar o agendamento no Windows. Para desfazer, use o cancelador.
+            </div>
           </div>
         `;
       },
@@ -944,9 +1231,21 @@
               </div>
               <div class="step-content">
                 <div>${inputHtml}</div>
-                <div><input type="text" value="${s.description}" oninput="app.updateStep('${s.id}', 'description', this.value)" placeholder="Descrição (ex: Clica no botão)"></div>
+                <div>
+                  <input type="text" value="${s.description}" oninput="app.updateStep('${s.id}', 'description', this.value)" placeholder="Descrição (ex: Clica no botão)">
+                  ${s.type !== 'wait' ? `
+                    <div style="display:flex; align-items:center; gap:6px; margin-top:8px;">
+                      <span style="font-size:11px; color:#6b7280; white-space:nowrap;" title="Tempo que o robô aguarda DEPOIS desta ação antes de seguir. Aumente se a tela/lista não acompanha.">⏳ Pausa após:</span>
+                      <input type="number" min="0" value="${this.stepPause(s)}" onchange="app.updateStep('${s.id}', 'pause', this.value)" style="width:90px; padding:6px;">
+                      <span style="font-size:11px; color:#6b7280;">ms</span>
+                    </div>
+                  ` : ''}
+                </div>
               </div>
-              <button class="step-remove" onclick="app.removeStep('${s.id}')">🗑️</button>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <button class="step-remove" onclick="app.duplicateStep('${s.id}')" title="Duplicar etapa" style="color:#005A40;">⧉</button>
+                <button class="step-remove" onclick="app.removeStep('${s.id}')" title="Excluir etapa">🗑️</button>
+              </div>
             </div>
           `;
         }).join('');
