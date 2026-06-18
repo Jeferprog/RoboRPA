@@ -672,6 +672,132 @@
       },
 
       // =========================================
+      // AGENDADOR (Windows Task Scheduler via .bat)
+      // =========================================
+      safeFileName(name) {
+        return name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      },
+      scheduleExtraHtml(freq) {
+        if (freq === 'ONCE') {
+          const today = new Date().toISOString().split('T')[0];
+          return `<div class="form-group" style="margin:0;"><label>Data</label><input type="date" id="sch-date" value="${today}"></div>`;
+        }
+        if (freq === 'WEEKLY') {
+          return `<div class="form-group" style="margin:0;"><label>Dia da semana</label>
+            <select id="sch-weekday">
+              <option value="MON">Segunda-feira</option>
+              <option value="TUE">Terça-feira</option>
+              <option value="WED">Quarta-feira</option>
+              <option value="THU">Quinta-feira</option>
+              <option value="FRI">Sexta-feira</option>
+              <option value="SAT">Sábado</option>
+              <option value="SUN">Domingo</option>
+            </select></div>`;
+        }
+        return `<div style="font-size:13px; color:#6b7280; padding-bottom:10px;">Vai rodar todos os dias no horário escolhido.</div>`;
+      },
+      renderScheduleFields() {
+        const freq = document.getElementById('sch-freq').value;
+        document.getElementById('sch-extra').innerHTML = this.scheduleExtraHtml(freq);
+      },
+      // Converte AAAA-MM-DD para DD/MM/AAAA (formato esperado pelo schtasks em pt-BR)
+      isoToBrDate(iso) {
+        const p = (iso || '').split('-');
+        return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
+      },
+      downloadBat(fileName, content) {
+        const blob = new Blob([content.replace(/\n/g, '\r\n')], { type: 'application/bat;charset=windows-1252' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      downloadScheduler(id) {
+        const script = this.scripts.find(s => s.id === id);
+        if (!script) return;
+
+        const safe = this.safeFileName(script.name);
+        const taskName = `CresolRPA_${safe}`;
+        const time = (document.getElementById('sch-time').value || '08:00');
+        const freq = document.getElementById('sch-freq').value;
+
+        let flags = '';
+        let descricao = '';
+        const weekdayPt = { MON: 'segunda', TUE: 'terca', WED: 'quarta', THU: 'quinta', FRI: 'sexta', SAT: 'sabado', SUN: 'domingo' };
+
+        if (freq === 'ONCE') {
+          const dateIso = document.getElementById('sch-date').value;
+          if (!dateIso) { alert('Escolha a data para o agendamento "Uma vez".'); return; }
+          const brDate = this.isoToBrDate(dateIso);
+          flags = `/sc ONCE /sd ${brDate} /st ${time}`;
+          descricao = `uma vez em ${brDate} as ${time}`;
+        } else if (freq === 'DAILY') {
+          flags = `/sc DAILY /st ${time}`;
+          descricao = `todos os dias as ${time}`;
+        } else if (freq === 'WEEKLY') {
+          const wd = document.getElementById('sch-weekday').value;
+          flags = `/sc WEEKLY /d ${wd} /st ${time}`;
+          descricao = `toda ${weekdayPt[wd]} as ${time}`;
+        }
+
+        // .bat: textos sem acentos para evitar problemas de codificacao no console
+        let bat = '';
+        bat += `@echo off\n`;
+        bat += `chcp 1252 >nul\n`;
+        bat += `title Agendador Cresol RPA\n`;
+        bat += `echo ============================================\n`;
+        bat += `echo  Agendador do robo: ${safe}\n`;
+        bat += `echo ============================================\n`;
+        bat += `echo.\n`;
+        bat += `set "ROBO=%~dp0${safe}.vbs"\n`;
+        bat += `if not exist "%ROBO%" (\n`;
+        bat += `  echo [ERRO] Arquivo do robo nao encontrado:\n`;
+        bat += `  echo    %ROBO%\n`;
+        bat += `  echo.\n`;
+        bat += `  echo Coloque este .bat na MESMA pasta do arquivo .vbs do robo.\n`;
+        bat += `  echo.\n`;
+        bat += `  pause\n`;
+        bat += `  exit /b 1\n`;
+        bat += `)\n`;
+        bat += `schtasks /create /tn "${taskName}" /tr "wscript.exe \\"%ROBO%\\"" ${flags} /f\n`;
+        bat += `if %errorlevel%==0 (\n`;
+        bat += `  echo.\n`;
+        bat += `  echo [OK] Agendamento criado com sucesso.\n`;
+        bat += `  echo O robo vai rodar ${descricao}.\n`;
+        bat += `) else (\n`;
+        bat += `  echo.\n`;
+        bat += `  echo [ERRO] Nao foi possivel criar o agendamento.\n`;
+        bat += `)\n`;
+        bat += `echo.\n`;
+        bat += `pause\n`;
+
+        this.downloadBat(`agendar_${safe}.bat`, bat);
+      },
+      downloadUnscheduler(id) {
+        const script = this.scripts.find(s => s.id === id);
+        if (!script) return;
+        const safe = this.safeFileName(script.name);
+        const taskName = `CresolRPA_${safe}`;
+
+        let bat = '';
+        bat += `@echo off\n`;
+        bat += `chcp 1252 >nul\n`;
+        bat += `title Cancelar Agendamento Cresol RPA\n`;
+        bat += `schtasks /delete /tn "${taskName}" /f\n`;
+        bat += `if %errorlevel%==0 (\n`;
+        bat += `  echo [OK] Agendamento removido.\n`;
+        bat += `) else (\n`;
+        bat += `  echo [AVISO] Nenhum agendamento encontrado com esse nome.\n`;
+        bat += `)\n`;
+        bat += `echo.\n`;
+        bat += `pause\n`;
+
+        this.downloadBat(`cancelar_${safe}.bat`, bat);
+      },
+
+      // =========================================
       // SIMULADOR (TESTE SEGURO - NÃO DIGITA NO SISTEMA)
       // =========================================
       // Substitui {{VAR}} pelo valor real, igual ao VBS gerado
@@ -947,6 +1073,35 @@
             <button class="btn-primary" onclick="app.downloadVBS('${script.id}')">
               ⬇️ Baixar Arquivo Executável (.vbs)
             </button>
+          </div>
+
+          <div class="variables-section" style="margin-top:32px;">
+            <div class="variables-title">⏰ Agendar execução automática</div>
+            <div style="font-size:13px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; padding:10px 12px; border-radius:8px; margin-bottom:20px;">
+              ⚠️ No horário marcado o computador precisa estar <strong>ligado e desbloqueado</strong>, com a <strong>janela do sistema aberta</strong>. Como na execução manual, o robô digita na janela em foco — então o agendamento serve para <strong>iniciar o robô na hora certa</strong>, com você presente.
+            </div>
+            <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
+              <div class="form-group" style="margin:0; flex:1; min-width:160px;">
+                <label>Frequência</label>
+                <select id="sch-freq" onchange="app.renderScheduleFields()">
+                  <option value="ONCE">Uma vez</option>
+                  <option value="DAILY">Todos os dias</option>
+                  <option value="WEEKLY">Toda semana</option>
+                </select>
+              </div>
+              <div id="sch-extra" style="flex:1; min-width:160px;">${this.scheduleExtraHtml('ONCE')}</div>
+              <div class="form-group" style="margin:0; min-width:120px;">
+                <label>Horário</label>
+                <input type="time" id="sch-time" value="08:00">
+              </div>
+            </div>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:20px;">
+              <button class="btn-success" onclick="app.downloadScheduler('${script.id}')">📅 Gerar agendador (.bat)</button>
+              <button class="btn-outline" onclick="app.downloadUnscheduler('${script.id}')">🗑️ Gerar cancelador (.bat)</button>
+            </div>
+            <div style="font-size:12px; color:#6b7280; margin-top:14px; line-height:1.5;">
+              <strong>Como usar:</strong> 1) Baixe o <strong>.vbs</strong> do robô (botão acima). 2) Salve o <strong>.bat</strong> na <strong>mesma pasta</strong> do .vbs. 3) Dê um <strong>duplo clique no .bat</strong> para criar o agendamento no Windows. Para desfazer, use o cancelador.
+            </div>
           </div>
         `;
       },
