@@ -198,6 +198,7 @@
       sim: null,
       debugMode: false,
       unattendedMode: false,
+      antiIdle: true,
       storageEnabled: true,
       commonKeys: ['Tab', 'Enter', 'Escape', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backspace', 'Delete', 'F12'],
 
@@ -555,6 +556,28 @@
         vbs += `' ==========================================\n\n`;
         vbs += `Set WshShell = WScript.CreateObject("WScript.Shell")\n`;
 
+        // --- Anti-ocioso: pausa "ativa" que mantém a máquina acordada SEM atrapalhar o robô ---
+        // Em vez de um Sleep grande (que deixa a máquina ociosa e a leva ao bloqueio), dividimos a
+        // espera em fatias e, ENTRE elas, enviamos {F15} — uma tecla neutra que não digita nada e
+        // não rouba o foco. Como isso só acontece DENTRO das pausas (nunca enquanto o robô digita),
+        // não há colisão com a digitação do robô.
+        const antiIdle = this.antiIdle;
+        const sleepCmd = antiIdle ? 'SleepAtivo' : 'WScript.Sleep';
+        if (antiIdle) {
+          vbs += `\n' --- Anti-ocioso (mantém a máquina ativa durante as pausas) ---\n`;
+          vbs += `Sub SleepAtivo(ms)\n`;
+          vbs += `  Dim restante, fatia\n`;
+          vbs += `  restante = ms\n`;
+          vbs += `  Do While restante > 0\n`;
+          vbs += `    fatia = restante\n`;
+          vbs += `    If fatia > 50000 Then fatia = 50000 ' fatia máxima de 50s\n`;
+          vbs += `    WScript.Sleep fatia\n`;
+          vbs += `    restante = restante - fatia\n`;
+          vbs += `    If restante > 0 Then WshShell.SendKeys "{F15}" ' tecla neutra: só evita ociosidade\n`;
+          vbs += `  Loop\n`;
+          vbs += `End Sub\n`;
+        }
+
         // Declarações globais para o passo "site" (uma só vez, evita Dim duplicado)
         const hasSite = script.steps.some(s => s.type === 'site');
         if (hasSite) {
@@ -642,13 +665,13 @@
           }
 
           if (step.type === 'wait') {
-            vbs += `${indent}WScript.Sleep ${step.value} ' ${step.description}\n`;
+            vbs += `${indent}${sleepCmd} ${step.value} ' ${step.description}\n`;
           } else if (step.type === 'key') {
             vbs += `${indent}WshShell.SendKeys "${this.escapeVBSKey(step.value)}" ' ${step.description}\n`;
-            vbs += `${indent}WScript.Sleep ${this.stepPause(step)}\n`;
+            vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
           } else if (step.type === 'run') {
             vbs += `${indent}WshShell.Run "${step.value.replace(/"/g, '""')}" ' ${step.description}\n`;
-            vbs += `${indent}WScript.Sleep ${this.stepPause(step)}\n`;
+            vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
           } else if (step.type === 'site') {
             // Abre o endereço no Firefox (caminhos declarados no topo). Se não existir, usa o navegador padrão.
             const url = (step.value || '').replace(/"/g, '""');
@@ -659,7 +682,7 @@
             vbs += `${indent}Else\n`;
             vbs += `${indent}  WshShell.Run """${url}"""\n`;
             vbs += `${indent}End If\n`;
-            vbs += `${indent}WScript.Sleep ${this.stepPause(step)}\n`;
+            vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
           } else if (step.type === 'type') {
             let text = step.value;
 
@@ -683,7 +706,7 @@
             if (vbsParts.length === 0) vbsParts.push('""');
 
             vbs += `${indent}WshShell.SendKeys ${vbsParts.join(' & ')} ' ${step.description}\n`;
-            vbs += `${indent}WScript.Sleep ${this.stepPause(step)}\n`;
+            vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
           }
 
           // Registra erro do passo, se houver
@@ -1117,6 +1140,12 @@
             <input type="checkbox" id="unattended-checkbox" ${this.unattendedMode ? 'checked' : ''} onchange="app.unattendedMode = this.checked" style="width:auto; margin-top:3px;">
             <label for="unattended-checkbox" style="font-size:13px; color:#065f46; cursor:pointer;">
               🤖 <strong>Modo desassistido</strong> (para agendamento) — troca os avisos que esperam clique por uma <strong>contagem automática</strong>, para o robô rodar sozinho. Ideal quando o próprio robô abre a janela (ex.: <strong>Abrir Site no Firefox</strong>), pois ela já fica em foco.
+            </label>
+          </div>
+          <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:16px; background:#eff6ff; border:1px solid #bfdbfe; padding:12px; border-radius:8px;">
+            <input type="checkbox" id="antiidle-checkbox" ${this.antiIdle ? 'checked' : ''} onchange="app.antiIdle = this.checked" style="width:auto; margin-top:3px;">
+            <label for="antiidle-checkbox" style="font-size:13px; color:#1e40af; cursor:pointer;">
+              ☕ <strong>Anti-ocioso</strong> (recomendado) — durante as <strong>pausas longas</strong> (ex.: os 15 min esperando o relatório), envia a tecla neutra <strong>F15</strong> a cada 50s para <strong>manter a máquina ativa</strong> e evitar o bloqueio. A F15 <strong>não digita nada nem muda o foco</strong>, e só é enviada dentro das pausas — portanto <strong>não atrapalha a digitação do robô</strong>.
             </label>
           </div>
           <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
