@@ -843,6 +843,31 @@
         a.click();
         URL.revokeObjectURL(url);
       },
+      // Parada de emergência: .bat que encerra na hora qualquer robô/anti-ocioso (wscript.exe).
+      downloadStopper() {
+        let bat = `@echo off\r\n`;
+        bat += `chcp 1252 >nul\r\n`;
+        bat += `title Parar robo - Cresol RPA\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo   Encerrando robos e anti-ocioso em execucao...\r\n`;
+        bat += `echo.\r\n`;
+        bat += `taskkill /F /IM wscript.exe >nul 2>&1\r\n`;
+        bat += `if %errorlevel%==0 (\r\n`;
+        bat += `  echo   Pronto^! Robo e anti-ocioso foram parados.\r\n`;
+        bat += `) else (\r\n`;
+        bat += `  echo   Nada estava em execucao ^(nenhum robo/anti-ocioso rodando^).\r\n`;
+        bat += `)\r\n`;
+        bat += `echo.\r\n`;
+        bat += `timeout /t 4 >nul\r\n`;
+
+        const blob = new Blob([bat], { type: 'application/bat;charset=windows-1252' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'parar_robo.bat';
+        a.click();
+        URL.revokeObjectURL(url);
+      },
       downloadScheduler(id) {
         const script = this.scripts.find(s => s.id === id);
         if (!script) return;
@@ -1214,6 +1239,12 @@
             <button class="btn-primary" onclick="app.downloadVBS('${script.id}')">
               ⬇️ Baixar Arquivo Executável (.vbs)
             </button>
+            <button class="btn-outline" onclick="app.downloadStopper()" title="Encerra na hora qualquer robô ou anti-ocioso em execução" style="color:#ef4444; border-color:#fecaca;">
+              ⛔ Baixar Parar Robô (.bat)
+            </button>
+          </div>
+          <div style="font-size:12px; color:#6b7280; margin-top:10px; line-height:1.5;">
+            <strong>⛔ Parada de emergência:</strong> guarde o <strong>parar_robo.bat</strong> na Área de Trabalho. Se precisar interromper, dê um <strong>duplo clique</strong> nele — encerra na hora o robô <em>e</em> o anti-ocioso. (Se o teclado estiver travado pelo robô, aperte <strong>Ctrl+Alt+Del</strong> primeiro para liberar.)
           </div>
 
           <div class="variables-section" style="margin-top:32px;">
