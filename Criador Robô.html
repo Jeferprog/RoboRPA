@@ -843,9 +843,47 @@
         a.click();
         URL.revokeObjectURL(url);
       },
-      // Parada de emergência: .bat que encerra na hora qualquer robô/anti-ocioso (wscript.exe).
-      downloadStopper() {
+      // Diagnóstico: .bat que reúne os eventos do Windows que explicam um desligamento/suspensão.
+      downloadDiagnostic() {
         let bat = `@echo off\r\n`;
+        bat += `chcp 1252 >nul\r\n`;
+        bat += `title Diagnostico de desligamento - Cresol RPA\r\n`;
+        bat += `set "OUT=%USERPROFILE%\\Desktop\\diagnostico_desligamento.txt"\r\n`;
+        bat += `echo Coletando informacoes do Windows... aguarde alguns segundos.\r\n`;
+        bat += `echo ===== DIAGNOSTICO DE DESLIGAMENTO / SUSPENSAO ===== > "%OUT%"\r\n`;
+        bat += `echo Gerado em: %date% %time% >> "%OUT%"\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        bat += `echo Guia rapido dos codigos (Id):>> "%OUT%"\r\n`;
+        bat += `echo   1074 = quem MANDOU desligar/reiniciar (Windows Update aparece aqui)>> "%OUT%"\r\n`;
+        bat += `echo   6006 = desligamento normal  ^|  6008 = desligamento INESPERADO (queda de energia)>> "%OUT%"\r\n`;
+        bat += `echo   41   = reiniciou sem desligar direito (falta de energia/travamento)>> "%OUT%"\r\n`;
+        bat += `echo   42   = entrou em SUSPENSAO  ^|  107 = acordou da suspensao>> "%OUT%"\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        bat += `echo ----- EVENTOS DE ENERGIA/DESLIGAMENTO (ultimas 36 horas) ----- >> "%OUT%"\r\n`;
+        bat += `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-WinEvent -FilterHashtable @{LogName='System'; StartTime=(Get-Date).AddHours(-36); Id=1074,6006,6008,41,42,107,109} | Sort-Object TimeCreated | Format-List TimeCreated,Id,ProviderName,Message" >> "%OUT%" 2>&1\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        bat += `echo ----- ULTIMO MOTIVO DE DESPERTAR ----- >> "%OUT%"\r\n`;
+        bat += `powercfg /lastwake >> "%OUT%" 2>&1\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        bat += `echo ----- TIMERS QUE PODEM ACORDAR/LIGAR O PC ----- >> "%OUT%"\r\n`;
+        bat += `powercfg /waketimers >> "%OUT%" 2>&1\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        bat += `echo ----- PLANO DE ENERGIA ATIVO ----- >> "%OUT%"\r\n`;
+        bat += `powercfg /getactivescheme >> "%OUT%" 2>&1\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        bat += `echo Pronto^! Abrindo o relatorio...\r\n`;
+        bat += `start notepad "%OUT%"\r\n`;
+
+        const blob = new Blob([bat], { type: 'application/bat;charset=windows-1252' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'diagnostico_desligamento.bat';
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      // Parada de emergência: .bat que encerra na hora qualquer robô/anti-ocioso (wscript.exe).
+      downloadStopper() {        let bat = `@echo off\r\n`;
         bat += `chcp 1252 >nul\r\n`;
         bat += `title Parar robo - Cresol RPA\r\n`;
         bat += `echo.\r\n`;
@@ -1288,6 +1326,19 @@
                 <strong>Como usar:</strong> dê um duplo clique no arquivo, informe quantas horas (ex.: 12),
                 e deixe-o aberto. Para parar antes, encerre <strong>wscript.exe</strong> no Gerenciador de Tarefas.
                 É independente do robô — pode rodar em qualquer máquina.
+              </div>
+              <hr style="border:none; border-top:1px solid #bfdbfe; margin:16px 0;">
+              <div style="font-weight:bold; color:#1e40af; margin-bottom:8px;">🔎 O PC desligou/suspendeu sozinho? Descubra o motivo</div>
+              <div style="font-size:13px; color:#1e3a8a; line-height:1.6; margin-bottom:14px;">
+                O anti-ocioso evita o bloqueio por inatividade, mas <strong>não impede</strong> um desligamento por
+                <strong>Windows Update</strong>, plano de energia ou queda de luz. Este diagnóstico lê os registros
+                do Windows e monta um relatório com o <strong>motivo exato</strong> do que aconteceu.
+              </div>
+              <button class="btn-outline" onclick="app.downloadDiagnostic()" style="color:#1e40af; border-color:#bfdbfe;">🔎 Baixar Diagnóstico (.bat)</button>
+              <div style="font-size:12px; color:#6b7280; margin-top:12px; line-height:1.5;">
+                <strong>Como usar:</strong> clique com o botão direito no <strong>diagnostico_desligamento.bat</strong> →
+                <strong>Executar como administrador</strong>. Ele abre um relatório na Área de Trabalho. Me envie o
+                conteúdo que eu te explico o que aconteceu.
               </div>
             </div>
           </div>
