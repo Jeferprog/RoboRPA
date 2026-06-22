@@ -442,7 +442,10 @@
       // Funções de Passos
       addStep(type) {
         // Adiciona o novo passo no INÍCIO do array (topo da lista)
-        this.editingScript.steps.unshift({ id: this.generateId(), type, value: type==='wait'?'1000':type==='key'?'Tab':type==='run'?'calc.exe':type==='site'?'https://www.cresol.com.br':'', description:'' });
+        const defaults = { wait:'1000', key:'Tab', combo:'Tab', run:'calc.exe', site:'https://www.cresol.com.br' };
+        const step = { id: this.generateId(), type, value: defaults[type] || '', description:'' };
+        if (type === 'combo') { step.ctrl = false; step.alt = true; step.shift = false; } // começa como Alt+Tab
+        this.editingScript.steps.unshift(step);
         this.renderCreator();
       },
       removeStep(id) {
@@ -461,7 +464,7 @@
       updateStep(id, field, value) {
         const s = this.editingScript.steps.find(x => x.id === id);
         if (s) s[field] = value;
-        if (field === 'type' || (field === 'value' && s.type === 'key')) this.renderCreator();
+        if (field === 'type' || (field === 'value' && s.type === 'key') || s.type === 'combo') this.renderCreator();
       },
       moveStep(index, dir) {
         // dir: -1 (sobe na tela, vai para índice menor), 1 (desce na tela, vai para índice maior)
@@ -523,6 +526,23 @@
           'Backspace': '{BACKSPACE}', 'Delete': '{DEL}'
         };
         return keyMap[key] || `{${key}}`;
+      },
+      // Combinação de teclas (ex.: Alt+Tab): texto amigável para a tela.
+      comboPreview(step) {
+        const parts = [];
+        if (step.ctrl) parts.push('Ctrl');
+        if (step.alt) parts.push('Alt');
+        if (step.shift) parts.push('Shift');
+        parts.push(step.value || '?');
+        return parts.join(' + ');
+      },
+      // Combinação de teclas: monta a string do SendKeys (^ = Ctrl, % = Alt, + = Shift).
+      comboSendKeys(step) {
+        let mod = '';
+        if (step.ctrl) mod += '^';
+        if (step.alt) mod += '%';
+        if (step.shift) mod += '+';
+        return mod + this.escapeVBSKey(step.value);
       },
       // Escapa texto para ficar dentro de "aspas" numa string literal do VBScript (log)
       escapeVBSString(text) {
@@ -601,7 +621,7 @@
         // Declarações globais para o passo "site" (uma só vez, evita Dim duplicado)
         const hasSite = script.steps.some(s => s.type === 'site');
         if (hasSite) {
-          vbs += `Dim ffFso, ff64, ff32\n`;
+          vbs += `Dim ffFso, ff64, ff32, fxAtiv, fxTry\n`;
           vbs += `Set ffFso = CreateObject("Scripting.FileSystemObject")\n`;
           vbs += `ff64 = "C:\\Program Files\\Mozilla Firefox\\firefox.exe"\n`;
           vbs += `ff32 = "C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe"\n`;
@@ -689,6 +709,9 @@
           } else if (step.type === 'key') {
             vbs += `${indent}WshShell.SendKeys "${this.escapeVBSKey(step.value)}" ' ${step.description}\n`;
             vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
+          } else if (step.type === 'combo') {
+            vbs += `${indent}WshShell.SendKeys "${this.comboSendKeys(step)}" ' ${step.description} (${this.comboPreview(step)})\n`;
+            vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
           } else if (step.type === 'run') {
             vbs += `${indent}WshShell.Run "${step.value.replace(/"/g, '""')}" ' ${step.description}\n`;
             vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
@@ -701,6 +724,14 @@
             vbs += `${indent}  WshShell.Run """" & ff32 & """ -new-window ""${url}"""\n`;
             vbs += `${indent}Else\n`;
             vbs += `${indent}  WshShell.Run """${url}"""\n`;
+            vbs += `${indent}End If\n`;
+            // Traz o Firefox para a frente (foco da tela) — tenta algumas vezes enquanto a janela abre.
+            vbs += `${indent}If ffFso.FileExists(ff64) Or ffFso.FileExists(ff32) Then\n`;
+            vbs += `${indent}  For fxTry = 1 To 10\n`;
+            vbs += `${indent}    fxAtiv = WshShell.AppActivate("Mozilla Firefox")\n`;
+            vbs += `${indent}    If fxAtiv Then Exit For\n`;
+            vbs += `${indent}    WScript.Sleep 400\n`;
+            vbs += `${indent}  Next\n`;
             vbs += `${indent}End If\n`;
             vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
           } else if (step.type === 'type') {
@@ -1032,6 +1063,7 @@
         const suffix = step.description ? ` — ${step.description}` : '';
         if (step.type === 'wait') return { icon: '⏱️', title: 'Esperar', detail: `Aguardar ${this.msToSec(step.value)} s${this.secHint(step.value)}${suffix}`, delay: parseInt(step.value) || 0 };
         if (step.type === 'key') return { icon: '⌨️', title: 'Pressionar tecla', detail: `[${step.value}]${suffix}`, delay: this.stepPause(step) };
+        if (step.type === 'combo') return { icon: '🎹', title: 'Combinação de teclas', detail: `${this.comboPreview(step)}${suffix}`, delay: this.stepPause(step) };
         if (step.type === 'run') return { icon: '🚀', title: 'Abrir programa', detail: `${step.value}${suffix}`, delay: this.stepPause(step) };
         if (step.type === 'site') return { icon: '🌐', title: 'Abrir site (Firefox)', detail: `${step.value}${suffix}`, delay: this.stepPause(step) };
         if (step.type === 'type') return { icon: '🔤', title: 'Digitar texto', detail: `"${this.resolveText(step.value, script)}"${suffix}`, delay: this.stepPause(step) };
@@ -1397,6 +1429,18 @@
               <option value="A" ${s.value === 'A' ? 'selected' : ''}>Letra A</option>
               <option value="B" ${s.value === 'B' ? 'selected' : ''}>Letra B</option>
             </select>`;
+          } else if (s.type === 'combo') {
+            const comboKeys = ['Tab','Enter','Escape','Space','Delete','Home','End','A','C','V','X','Z','S','F4'];
+            inputHtml = `<div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+              <label style="display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer; width:auto;"><input type="checkbox" style="width:auto;" ${s.ctrl?'checked':''} onchange="app.updateStep('${s.id}','ctrl',this.checked)"> Ctrl</label>
+              <label style="display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer; width:auto;"><input type="checkbox" style="width:auto;" ${s.alt?'checked':''} onchange="app.updateStep('${s.id}','alt',this.checked)"> Alt</label>
+              <label style="display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer; width:auto;"><input type="checkbox" style="width:auto;" ${s.shift?'checked':''} onchange="app.updateStep('${s.id}','shift',this.checked)"> Shift</label>
+              <span style="color:#9ca3af;">+</span>
+              <select style="width:auto;" onchange="app.updateStep('${s.id}','value',this.value)">
+                ${comboKeys.map(k => `<option value="${k}" ${s.value === k ? 'selected' : ''}>${k}</option>`).join('')}
+              </select>
+              <span style="font-size:13px; font-weight:bold; color:#005A40; background:#f0fdf4; border:1px solid #bbf7d0; padding:3px 10px; border-radius:6px;">= ${this.comboPreview(s)}</span>
+            </div>`;
           } else if (s.type === 'type') {
             inputHtml = `<input type="text" value="${s.value}" onchange="app.updateStep('${s.id}', 'value', this.value)" placeholder="Texto para digitar...">`;
           } else if (s.type === 'wait') {
@@ -1410,7 +1454,7 @@
             inputHtml = `<input type="text" value="${s.value}" onchange="app.updateStep('${s.id}', 'value', this.value)" placeholder="Endereço do site (ex: https://www.cresol.com.br)">`;
           }
 
-          const icon = s.type === 'key' ? '⌨️' : s.type === 'type' ? '🔤' : s.type === 'wait' ? '⏱️' : s.type === 'site' ? '🌐' : '🚀';
+          const icon = s.type === 'key' ? '⌨️' : s.type === 'combo' ? '🎹' : s.type === 'type' ? '🔤' : s.type === 'wait' ? '⏱️' : s.type === 'site' ? '🌐' : '🚀';
           const stepNumber = this.editingScript.steps.length - index;
 
           return `
@@ -1457,8 +1501,15 @@
         let tipsHtml = '';
         if (this.editingScript.variables.length > 0) {
           tipsHtml = `<div style="padding:12px; background:#eff6ff; border-top:1px solid #bfdbfe; font-size:13px; color:#1e40af; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-            <strong>Dica:</strong> Para usar variáveis no texto, copie e cole: 
+            <strong>Dica:</strong> Para usar variáveis no texto, copie e cole:
             ${this.editingScript.variables.map(v => `<span class="code-tag" style="background:white;">{{${v.id}}}</span>`).join('')}
+          </div>`;
+        }
+        // Aviso específico: Alt+Tab via robô é instável no Windows.
+        if (this.editingScript.steps.some(s => s.type === 'combo' && s.alt && s.value === 'Tab')) {
+          tipsHtml += `<div style="padding:12px; background:#fffbeb; border-top:1px solid #fde68a; font-size:13px; color:#92400e; display:flex; gap:8px; align-items:flex-start; flex-wrap:wrap;">
+            <span>⚠️</span>
+            <div><strong>Sobre o Alt+Tab:</strong> o Windows costuma <strong>ignorar Alt+Tab enviado por robô</strong> (é uma proteção do sistema). Combinações como <strong>Ctrl+C, Ctrl+V, Alt+F4</strong> funcionam bem. Para <strong>alternar para uma janela específica</strong> de forma confiável, prefira o passo <strong>🌐 Abrir Site (Firefox)</strong> (que já traz a janela para o foco) — me peça se precisar focar outro programa.</div>
           </div>`;
         }
 
@@ -1493,6 +1544,7 @@
                 <h3 style="font-size:16px; color:#111827;">Passos do Robô</h3>
                 <div class="steps-actions">
                   <button onclick="app.addStep('key')">⌨️ Tecla</button>
+                  <button onclick="app.addStep('combo')">🎹 Combinação (2 teclas)</button>
                   <button onclick="app.addStep('type')">🔤 Digitar Texto</button>
                   <button onclick="app.addStep('wait')">⏱️ Esperar</button>
                   <button onclick="app.addStep('run')">🚀 Abrir Programa</button>
