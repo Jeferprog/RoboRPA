@@ -442,7 +442,7 @@
       // Funções de Passos
       addStep(type) {
         // Adiciona o novo passo no INÍCIO do array (topo da lista)
-        const defaults = { wait:'1000', key:'Tab', combo:'Tab', run:'calc.exe', site:'https://www.cresol.com.br' };
+        const defaults = { wait:'1000', key:'Tab', combo:'Tab', run:'calc.exe', site:'https://www.cresol.com.br', focus:'Mozilla Firefox' };
         const step = { id: this.generateId(), type, value: defaults[type] || '', description:'' };
         if (type === 'combo') { step.ctrl = false; step.alt = true; step.shift = false; } // começa como Alt+Tab
         this.editingScript.steps.unshift(step);
@@ -618,8 +618,8 @@
           vbs += `End Sub\n`;
         }
 
-        // Declarações globais para o passo "site" (uma só vez, evita Dim duplicado)
-        const hasSite = script.steps.some(s => s.type === 'site');
+        // Declarações globais para os passos "site" e "focar" (uma só vez, evita Dim duplicado)
+        const hasSite = script.steps.some(s => s.type === 'site' || s.type === 'focus');
         if (hasSite) {
           vbs += `Dim ffFso, ff64, ff32, fxAtiv, fxTry\n`;
           vbs += `Set ffFso = CreateObject("Scripting.FileSystemObject")\n`;
@@ -733,6 +733,15 @@
             vbs += `${indent}    WScript.Sleep 400\n`;
             vbs += `${indent}  Next\n`;
             vbs += `${indent}End If\n`;
+            vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
+          } else if (step.type === 'focus') {
+            // Traz o Firefox (ou a janela informada) para a frente, sem abrir nada novo.
+            const win = (step.value || 'Mozilla Firefox').replace(/"/g, '""');
+            vbs += `${indent}For fxTry = 1 To 10 ' ${step.description}\n`;
+            vbs += `${indent}  fxAtiv = WshShell.AppActivate("${win}")\n`;
+            vbs += `${indent}  If fxAtiv Then Exit For\n`;
+            vbs += `${indent}  WScript.Sleep 400\n`;
+            vbs += `${indent}Next\n`;
             vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
           } else if (step.type === 'type') {
             let text = step.value;
@@ -1066,6 +1075,7 @@
         if (step.type === 'combo') return { icon: '🎹', title: 'Combinação de teclas', detail: `${this.comboPreview(step)}${suffix}`, delay: this.stepPause(step) };
         if (step.type === 'run') return { icon: '🚀', title: 'Abrir programa', detail: `${step.value}${suffix}`, delay: this.stepPause(step) };
         if (step.type === 'site') return { icon: '🌐', title: 'Abrir site (Firefox)', detail: `${step.value}${suffix}`, delay: this.stepPause(step) };
+        if (step.type === 'focus') return { icon: '🎯', title: 'Focar janela (Firefox)', detail: `Trazer "${step.value || 'Mozilla Firefox'}" para a frente${suffix}`, delay: this.stepPause(step) };
         if (step.type === 'type') return { icon: '🔤', title: 'Digitar texto', detail: `"${this.resolveText(step.value, script)}"${suffix}`, delay: this.stepPause(step) };
         return { icon: '•', title: step.type, detail: `${step.value}${suffix}`, delay: 300 };
       },
@@ -1452,9 +1462,14 @@
             inputHtml = `<input type="text" value="${s.value}" onchange="app.updateStep('${s.id}', 'value', this.value)" placeholder="Caminho ou comando (ex: calc.exe)">`;
           } else if (s.type === 'site') {
             inputHtml = `<input type="text" value="${s.value}" onchange="app.updateStep('${s.id}', 'value', this.value)" placeholder="Endereço do site (ex: https://www.cresol.com.br)">`;
+          } else if (s.type === 'focus') {
+            inputHtml = `<div style="display:flex; flex-direction:column; gap:6px;">
+              <input type="text" value="${s.value}" onchange="app.updateStep('${s.id}', 'value', this.value)" placeholder="Título da janela (ex: Mozilla Firefox)">
+              <span style="font-size:12px; color:#6b7280;">🎯 Traz a janela do Firefox (já aberta) para a frente, sem abrir nova aba. Basta parte do título.</span>
+            </div>`;
           }
 
-          const icon = s.type === 'key' ? '⌨️' : s.type === 'combo' ? '🎹' : s.type === 'type' ? '🔤' : s.type === 'wait' ? '⏱️' : s.type === 'site' ? '🌐' : '🚀';
+          const icon = s.type === 'key' ? '⌨️' : s.type === 'combo' ? '🎹' : s.type === 'type' ? '🔤' : s.type === 'wait' ? '⏱️' : s.type === 'site' ? '🌐' : s.type === 'focus' ? '🎯' : '🚀';
           const stepNumber = this.editingScript.steps.length - index;
 
           return `
@@ -1509,7 +1524,7 @@
         if (this.editingScript.steps.some(s => s.type === 'combo' && s.alt && s.value === 'Tab')) {
           tipsHtml += `<div style="padding:12px; background:#fffbeb; border-top:1px solid #fde68a; font-size:13px; color:#92400e; display:flex; gap:8px; align-items:flex-start; flex-wrap:wrap;">
             <span>⚠️</span>
-            <div><strong>Sobre o Alt+Tab:</strong> o Windows costuma <strong>ignorar Alt+Tab enviado por robô</strong> (é uma proteção do sistema). Combinações como <strong>Ctrl+C, Ctrl+V, Alt+F4</strong> funcionam bem. Para <strong>alternar para uma janela específica</strong> de forma confiável, prefira o passo <strong>🌐 Abrir Site (Firefox)</strong> (que já traz a janela para o foco) — me peça se precisar focar outro programa.</div>
+            <div><strong>Sobre o Alt+Tab:</strong> o Windows costuma <strong>ignorar Alt+Tab enviado por robô</strong> (é uma proteção do sistema). Combinações como <strong>Ctrl+C, Ctrl+V, Alt+F4</strong> funcionam bem. Para <strong>alternar para o Firefox já aberto</strong> de forma confiável, use o passo <strong>🎯 Focar Firefox</strong> (traz a janela para a frente sem abrir nada novo).</div>
           </div>`;
         }
 
@@ -1549,6 +1564,7 @@
                   <button onclick="app.addStep('wait')">⏱️ Esperar</button>
                   <button onclick="app.addStep('run')">🚀 Abrir Programa</button>
                   <button onclick="app.addStep('site')">🌐 Abrir Site (Firefox)</button>
+                  <button onclick="app.addStep('focus')">🎯 Focar Firefox</button>
                 </div>
               </div>
               <div style="padding: 12px 20px; background: #f0fdf4; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between;">
