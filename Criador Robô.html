@@ -476,7 +476,7 @@
       // Funções de Passos
       addStep(type) {
         // Adiciona o novo passo no INÍCIO do array (topo da lista)
-        const defaults = { wait:'1000', key:'Tab', combo:'Tab', run:'calc.exe', site:'https://www.cresol.com.br', focus:'Mozilla Firefox' };
+        const defaults = { wait:'1000', key:'Tab', combo:'Tab', run:'calc.exe', site:'https://www.cresol.com.br', focus:'Mozilla Firefox', anchor:'1' };
         const step = { id: this.generateId(), type, value: defaults[type] || '', description:'' };
         if (type === 'combo') { step.ctrl = false; step.alt = true; step.shift = false; } // começa como Alt+Tab
         this.editingScript.steps.unshift(step);
@@ -776,6 +776,16 @@
             vbs += `${indent}  If fxAtiv Then Exit For\n`;
             vbs += `${indent}  WScript.Sleep 400\n`;
             vbs += `${indent}Next\n`;
+            vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
+          } else if (step.type === 'anchor') {
+            // Inicio padrao: foca a barra de endereco (Ctrl+L, sempre o mesmo ponto)
+            // e entra na pagina com um numero FIXO de Tabs, garantindo origem identica a cada execucao.
+            const tabs = Math.max(0, parseInt(step.value) || 0);
+            vbs += `${indent}WshShell.SendKeys "^l" ' ${step.description} (Ctrl+L: foca a barra de endereco)\n`;
+            vbs += `${indent}WScript.Sleep 400\n`;
+            if (tabs > 0) {
+              vbs += `${indent}WshShell.SendKeys "{TAB ${tabs}}" ' entra na pagina (${tabs} Tab fixo)\n`;
+            }
             vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
           } else if (step.type === 'type') {
             let text = step.value;
@@ -1186,6 +1196,7 @@
         if (step.type === 'run') return { icon: '🚀', title: 'Abrir programa', detail: `${step.value}${suffix}`, delay: this.stepPause(step) };
         if (step.type === 'site') return { icon: '🌐', title: 'Abrir site (Firefox)', detail: `${step.value}${suffix}`, delay: this.stepPause(step) };
         if (step.type === 'focus') return { icon: '🎯', title: 'Focar janela (Firefox)', detail: `Trazer "${step.value || 'Mozilla Firefox'}" para a frente${suffix}`, delay: this.stepPause(step) };
+        if (step.type === 'anchor') return { icon: '📍', title: 'Início padrão (ancorar foco)', detail: `Ctrl+L + ${Math.max(0, parseInt(step.value) || 0)} Tab — origem fixa a cada execução${suffix}`, delay: this.stepPause(step) };
         if (step.type === 'type') return { icon: '🔤', title: 'Digitar texto', detail: `"${this.resolveText(step.value, script)}"${suffix}`, delay: this.stepPause(step) };
         return { icon: '•', title: step.type, detail: `${step.value}${suffix}`, delay: 300 };
       },
@@ -1551,7 +1562,7 @@
               <option value="B" ${s.value === 'B' ? 'selected' : ''}>Letra B</option>
             </select>`;
           } else if (s.type === 'combo') {
-            const comboKeys = ['Tab','Enter','Escape','Space','Delete','Home','End','A','C','V','X','Z','S','F4'];
+            const comboKeys = ['Tab','Enter','Escape','Space','Delete','Home','End','A','C','V','X','Z','S','L','F4'];
             inputHtml = `<div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
               <label style="display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer; width:auto;"><input type="checkbox" style="width:auto;" ${s.ctrl?'checked':''} onchange="app.updateStep('${s.id}','ctrl',this.checked)"> Ctrl</label>
               <label style="display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer; width:auto;"><input type="checkbox" style="width:auto;" ${s.alt?'checked':''} onchange="app.updateStep('${s.id}','alt',this.checked)"> Alt</label>
@@ -1578,9 +1589,18 @@
               <input type="text" value="${s.value}" onchange="app.updateStep('${s.id}', 'value', this.value)" placeholder="Título da janela (ex: Mozilla Firefox)">
               <span style="font-size:12px; color:#6b7280;">🎯 Traz a janela do Firefox (já aberta) para a frente, sem abrir nova aba. Basta parte do título.</span>
             </div>`;
+          } else if (s.type === 'anchor') {
+            inputHtml = `<div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:13px; color:#374151;">Ctrl+L e depois</span>
+                <input type="number" min="0" step="1" value="${parseInt(s.value) || 0}" onchange="app.updateStep('${s.id}', 'value', this.value)" style="width:70px;">
+                <span style="font-size:13px; color:#374151;">Tab(s)</span>
+              </div>
+              <span style="font-size:12px; color:#6b7280;">📍 <strong>Início padrão:</strong> foca a barra de endereço (sempre o mesmo ponto) e entra na página com um nº fixo de Tabs. Coloque este passo <strong>logo após Abrir Site</strong>, assim toda execução começa do mesmo lugar.</span>
+            </div>`;
           }
 
-          const icon = s.type === 'key' ? '⌨️' : s.type === 'combo' ? '🎹' : s.type === 'type' ? '🔤' : s.type === 'wait' ? '⏱️' : s.type === 'site' ? '🌐' : s.type === 'focus' ? '🎯' : '🚀';
+          const icon = s.type === 'key' ? '⌨️' : s.type === 'combo' ? '🎹' : s.type === 'type' ? '🔤' : s.type === 'wait' ? '⏱️' : s.type === 'site' ? '🌐' : s.type === 'focus' ? '🎯' : s.type === 'anchor' ? '📍' : '🚀';
           const stepNumber = this.editingScript.steps.length - index;
 
           return `
@@ -1676,6 +1696,7 @@
                   <button onclick="app.addStep('run')">🚀 Abrir Programa</button>
                   <button onclick="app.addStep('site')">🌐 Abrir Site (Firefox)</button>
                   <button onclick="app.addStep('focus')">🎯 Focar Firefox</button>
+                  <button onclick="app.addStep('anchor')">📍 Início padrão (foco fixo)</button>
                 </div>
               </div>
               <div style="padding: 12px 20px; background: #f0fdf4; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between;">
