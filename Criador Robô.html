@@ -1077,9 +1077,73 @@
         this.downloadBat(`cancelar_${safe}.bat`, bat);
       },
 
-      // =========================================
-      // SIMULADOR (TESTE SEGURO - NÃO DIGITA NO SISTEMA)
-      // =========================================
+      // Diagnóstico do agendamento: pergunta ao Windows por que a tarefa (não) rodou.
+      downloadScheduleDiagnostic(id) {
+        const script = this.scripts.find(s => s.id === id);
+        if (!script) return;
+        const safe = this.safeFileName(script.name);
+        const taskName = `CresolRPA_${safe}`;
+
+        let bat = `@echo off\r\n`;
+        bat += `chcp 1252 >nul\r\n`;
+        bat += `title Diagnostico do agendamento - Cresol RPA\r\n`;
+        bat += `set "OUT=%USERPROFILE%\\Desktop\\diagnostico_agendamento_${safe}.txt"\r\n`;
+        bat += `set "ROBO=%~dp0${safe}.vbs"\r\n`;
+        bat += `echo Coletando informacoes do agendamento... aguarde.\r\n`;
+        bat += `echo ===== DIAGNOSTICO DO AGENDAMENTO ===== > "%OUT%"\r\n`;
+        bat += `echo Robo: ${safe} >> "%OUT%"\r\n`;
+        bat += `echo Tarefa: ${taskName} >> "%OUT%"\r\n`;
+        bat += `echo Gerado em: %date% %time% >> "%OUT%"\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        // 1) O arquivo do robô existe na pasta?
+        bat += `echo ----- 1) ARQUIVO DO ROBO (.vbs) ----- >> "%OUT%"\r\n`;
+        bat += `if exist "%ROBO%" (echo [OK] Encontrado: %ROBO% >> "%OUT%") else (echo [PROBLEMA] NAO encontrado nesta pasta: %ROBO% >> "%OUT%" ^& echo Coloque este .bat na MESMA pasta do .vbs e rode de novo. >> "%OUT%")\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        // 2) A tarefa existe? Status, ultima execucao, ultimo resultado, proxima execucao
+        bat += `echo ----- 2) SITUACAO DA TAREFA NO WINDOWS ----- >> "%OUT%"\r\n`;
+        bat += `schtasks /query /tn "${taskName}" >nul 2>&1\r\n`;
+        bat += `if %errorlevel% neq 0 (\r\n`;
+        bat += `  echo [PROBLEMA] A tarefa "${taskName}" NAO existe no Agendador. >> "%OUT%"\r\n`;
+        bat += `  echo O agendador .bat pode nao ter sido executado, ou foi cancelado. >> "%OUT%"\r\n`;
+        bat += `  echo Rode o "agendar_${safe}.bat" novamente. >> "%OUT%"\r\n`;
+        bat += `) else (\r\n`;
+        bat += `  schtasks /query /tn "${taskName}" /v /fo LIST | findstr /i "Status Resultado Result Proxima Next Ultima Last Conectar Logon Executar Run" >> "%OUT%" 2>&1\r\n`;
+        bat += `)\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        // 3) Guia dos codigos de "Ultimo resultado"
+        bat += `echo ----- 3) O QUE SIGNIFICA O "ULTIMO RESULTADO" ----- >> "%OUT%"\r\n`;
+        bat += `echo   0 ^(0x0^)        = rodou com SUCESSO >> "%OUT%"\r\n`;
+        bat += `echo   267011 ^(0x41303^) = a tarefa NUNCA foi executada >> "%OUT%"\r\n`;
+        bat += `echo   267009 ^(0x41301^) = esta em execucao agora >> "%OUT%"\r\n`;
+        bat += `echo   267010 ^(0x41302^) = a tarefa esta DESABILITADA >> "%OUT%"\r\n`;
+        bat += `echo   267014 ^(0x41306^) = foi encerrada/cancelada antes do fim >> "%OUT%"\r\n`;
+        bat += `echo   1 / 2          = erro: arquivo nao encontrado ou caminho errado >> "%OUT%"\r\n`;
+        bat += `echo   2147942402     = arquivo do robo nao existe no caminho agendado >> "%OUT%"\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        // 4) Historico de eventos do Agendador para esta tarefa (motivos de nao ter disparado)
+        bat += `echo ----- 4) HISTORICO DO AGENDADOR (ultimas 48h) ----- >> "%OUT%"\r\n`;
+        bat += `echo Procure por mensagens como "condicao de inicializacao nao atendida" >> "%OUT%"\r\n`;
+        bat += `echo (ex.: PC estava em bateria, ou usuario nao estava conectado). >> "%OUT%"\r\n`;
+        bat += `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-TaskScheduler/Operational'; StartTime=(Get-Date).AddHours(-48)} -ErrorAction SilentlyContinue | Where-Object { $_.Message -match '${taskName}' } | Sort-Object TimeCreated | Format-List TimeCreated,Id,Message" >> "%OUT%" 2>&1\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        // 5) PC estava ligado/acordado no horario?
+        bat += `echo ----- 5) O PC ESTAVA LIGADO/ACORDADO NO HORARIO? ----- >> "%OUT%"\r\n`;
+        bat += `echo (Id 1 = ligou, 42 = suspendeu, 107 = acordou, 6005 = iniciou) >> "%OUT%"\r\n`;
+        bat += `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-WinEvent -FilterHashtable @{LogName='System'; StartTime=(Get-Date).AddHours(-48); Id=1,12,13,42,107,6005,6006} -ErrorAction SilentlyContinue | Sort-Object TimeCreated | Format-List TimeCreated,Id,ProviderName" >> "%OUT%" 2>&1\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        bat += `echo Pronto^! Abrindo o relatorio...\r\n`;
+        bat += `start notepad "%OUT%"\r\n`;
+
+        const blob = new Blob([bat], { type: 'application/bat;charset=windows-1252' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `diagnostico_agendamento_${safe}.bat`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+
+
       // Substitui {{VAR}} pelo valor real, igual ao VBS gerado
       resolveText(text, script) {
         return (text || '').replace(/\{\{([^}]+)\}\}/g, (m, varId) => {
@@ -1398,6 +1462,7 @@
             <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:20px;">
               <button class="btn-success" onclick="app.downloadScheduler('${script.id}')">📅 Gerar agendador (.bat)</button>
               <button class="btn-outline" onclick="app.downloadUnscheduler('${script.id}')">🗑️ Gerar cancelador (.bat)</button>
+              <button class="btn-outline" onclick="app.downloadScheduleDiagnostic('${script.id}')" title="Descobre por que a tarefa agendada nao rodou">🔎 Diagnosticar agendamento (.bat)</button>
             </div>
             <div style="font-size:12px; color:#6b7280; margin-top:14px; line-height:1.5;">
               <strong>Como usar:</strong> 1) Baixe o <strong>.vbs</strong> do robô (botão acima). 2) Salve o <strong>.bat</strong> na <strong>mesma pasta</strong> do .vbs. 3) Dê um <strong>duplo clique no .bat</strong> para criar o agendamento no Windows. Para desfazer, use o cancelador.
