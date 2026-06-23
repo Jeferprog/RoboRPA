@@ -476,7 +476,7 @@
       // Funções de Passos
       addStep(type) {
         // Adiciona o novo passo no INÍCIO do array (topo da lista)
-        const defaults = { wait:'1000', key:'Tab', combo:'Tab', run:'calc.exe', site:'https://www.cresol.com.br', focus:'Mozilla Firefox' };
+        const defaults = { wait:'1000', key:'Tab', combo:'Tab', run:'calc.exe', site:'https://www.cresol.com.br', focus:'Mozilla Firefox', anchor:'1' };
         const step = { id: this.generateId(), type, value: defaults[type] || '', description:'' };
         if (type === 'combo') { step.ctrl = false; step.alt = true; step.shift = false; } // começa como Alt+Tab
         this.editingScript.steps.unshift(step);
@@ -777,6 +777,16 @@
             vbs += `${indent}  WScript.Sleep 400\n`;
             vbs += `${indent}Next\n`;
             vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
+          } else if (step.type === 'anchor') {
+            // Inicio padrao: foca a barra de endereco (Ctrl+L, sempre o mesmo ponto)
+            // e entra na pagina com um numero FIXO de Tabs, garantindo origem identica a cada execucao.
+            const tabs = Math.max(0, parseInt(step.value) || 0);
+            vbs += `${indent}WshShell.SendKeys "^l" ' ${step.description} (Ctrl+L: foca a barra de endereco)\n`;
+            vbs += `${indent}WScript.Sleep 400\n`;
+            if (tabs > 0) {
+              vbs += `${indent}WshShell.SendKeys "{TAB ${tabs}}" ' entra na pagina (${tabs} Tab fixo)\n`;
+            }
+            vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
           } else if (step.type === 'type') {
             let text = step.value;
 
@@ -1046,10 +1056,19 @@
         bat += `  echo.\n`;
         bat += `  echo [OK] Agendamento criado com sucesso.\n`;
         bat += `  echo O robo vai rodar ${descricao}.\n`;
+        bat += `  echo.\n`;
+        bat += `  echo Ajustando energia: acordar o PC e rodar mesmo apos horario perdido...\n`;
+        // Ajustes que o schtasks /create nao oferece: acordar o PC, rodar se perdido, e na bateria.
+        bat += `  powershell -NoProfile -ExecutionPolicy Bypass -Command "$t = Get-ScheduledTask -TaskName '${taskName}'; $t.Settings.WakeToRun = $true; $t.Settings.StartWhenAvailable = $true; $t.Settings.DisallowStartIfOnBatteries = $false; $t.Settings.StopIfGoingOnBatteries = $false; Set-ScheduledTask -InputObject $t | Out-Null" 2>nul\n`;
+        bat += `  if errorlevel 1 (echo [AVISO] Nao foi possivel ajustar a energia automaticamente. Veja a observacao abaixo.) else (echo [OK] Energia ajustada: o PC sera acordado para executar.)\n`;
         bat += `) else (\n`;
         bat += `  echo.\n`;
         bat += `  echo [ERRO] Nao foi possivel criar o agendamento.\n`;
         bat += `)\n`;
+        bat += `echo.\n`;
+        bat += `echo IMPORTANTE: para o robo digitar, a tela precisa estar DESBLOQUEADA e a\n`;
+        bat += `echo janela do sistema aberta no horario. Acordar da suspensao mantem a tela\n`;
+        bat += `echo bloqueada; entao, para rodar 100%% sozinho, deixe o PC ligado e sem bloquear.\n`;
         bat += `echo.\n`;
         bat += `pause\n`;
 
@@ -1107,7 +1126,7 @@
         bat += `  echo O agendador .bat pode nao ter sido executado, ou foi cancelado. >> "%OUT%"\r\n`;
         bat += `  echo Rode o "agendar_${safe}.bat" novamente. >> "%OUT%"\r\n`;
         bat += `) else (\r\n`;
-        bat += `  schtasks /query /tn "${taskName}" /v /fo LIST | findstr /i "Status Resultado Result Proxima Next Ultima Last Conectar Logon Executar Run" >> "%OUT%" 2>&1\r\n`;
+        bat += `  schtasks /query /tn "${taskName}" /v /fo LIST >> "%OUT%" 2>&1\r\n`;
         bat += `)\r\n`;
         bat += `echo. >> "%OUT%"\r\n`;
         // 3) Guia dos codigos de "Ultimo resultado"
@@ -1128,8 +1147,11 @@
         bat += `echo. >> "%OUT%"\r\n`;
         // 5) PC estava ligado/acordado no horario?
         bat += `echo ----- 5) O PC ESTAVA LIGADO/ACORDADO NO HORARIO? ----- >> "%OUT%"\r\n`;
-        bat += `echo (Id 1 = ligou, 42 = suspendeu, 107 = acordou, 6005 = iniciou) >> "%OUT%"\r\n`;
-        bat += `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-WinEvent -FilterHashtable @{LogName='System'; StartTime=(Get-Date).AddHours(-48); Id=1,12,13,42,107,6005,6006} -ErrorAction SilentlyContinue | Sort-Object TimeCreated | Format-List TimeCreated,Id,ProviderName" >> "%OUT%" 2>&1\r\n`;
+        bat += `echo Procure pelo horario do agendamento. Se houver SUSPENDEU antes e ACORDOU >> "%OUT%"\r\n`;
+        bat += `echo depois, o PC estava dormindo na hora e a tarefa foi perdida. >> "%OUT%"\r\n`;
+        bat += `echo   42 = SUSPENDEU (dormiu)  ^|  107 = ACORDOU  ^|  1(Power-Troubleshooter) = ACORDOU >> "%OUT%"\r\n`;
+        bat += `echo   6005 = PC iniciou (boot)  ^|  6006 = desligou normalmente >> "%OUT%"\r\n`;
+        bat += `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-WinEvent -FilterHashtable @{LogName='System'; StartTime=(Get-Date).AddHours(-48); ProviderName='Microsoft-Windows-Kernel-Power','Microsoft-Windows-Power-Troubleshooter','EventLog'} -ErrorAction SilentlyContinue | Where-Object { $_.Id -in 42,107,1,6005,6006,6008 } | Sort-Object TimeCreated | Format-List TimeCreated,Id,ProviderName,Message" >> "%OUT%" 2>&1\r\n`;
         bat += `echo. >> "%OUT%"\r\n`;
         bat += `echo Pronto^! Abrindo o relatorio...\r\n`;
         bat += `start notepad "%OUT%"\r\n`;
@@ -1174,6 +1196,7 @@
         if (step.type === 'run') return { icon: '🚀', title: 'Abrir programa', detail: `${step.value}${suffix}`, delay: this.stepPause(step) };
         if (step.type === 'site') return { icon: '🌐', title: 'Abrir site (Firefox)', detail: `${step.value}${suffix}`, delay: this.stepPause(step) };
         if (step.type === 'focus') return { icon: '🎯', title: 'Focar janela (Firefox)', detail: `Trazer "${step.value || 'Mozilla Firefox'}" para a frente${suffix}`, delay: this.stepPause(step) };
+        if (step.type === 'anchor') return { icon: '📍', title: 'Início padrão (ancorar foco)', detail: `Ctrl+L + ${Math.max(0, parseInt(step.value) || 0)} Tab — origem fixa a cada execução${suffix}`, delay: this.stepPause(step) };
         if (step.type === 'type') return { icon: '🔤', title: 'Digitar texto', detail: `"${this.resolveText(step.value, script)}"${suffix}`, delay: this.stepPause(step) };
         return { icon: '•', title: step.type, detail: `${step.value}${suffix}`, delay: 300 };
       },
@@ -1539,7 +1562,7 @@
               <option value="B" ${s.value === 'B' ? 'selected' : ''}>Letra B</option>
             </select>`;
           } else if (s.type === 'combo') {
-            const comboKeys = ['Tab','Enter','Escape','Space','Delete','Home','End','A','C','V','X','Z','S','F4'];
+            const comboKeys = ['Tab','Enter','Escape','Space','Delete','Home','End','A','C','V','X','Z','S','L','F4'];
             inputHtml = `<div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
               <label style="display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer; width:auto;"><input type="checkbox" style="width:auto;" ${s.ctrl?'checked':''} onchange="app.updateStep('${s.id}','ctrl',this.checked)"> Ctrl</label>
               <label style="display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer; width:auto;"><input type="checkbox" style="width:auto;" ${s.alt?'checked':''} onchange="app.updateStep('${s.id}','alt',this.checked)"> Alt</label>
@@ -1566,9 +1589,18 @@
               <input type="text" value="${s.value}" onchange="app.updateStep('${s.id}', 'value', this.value)" placeholder="Título da janela (ex: Mozilla Firefox)">
               <span style="font-size:12px; color:#6b7280;">🎯 Traz a janela do Firefox (já aberta) para a frente, sem abrir nova aba. Basta parte do título.</span>
             </div>`;
+          } else if (s.type === 'anchor') {
+            inputHtml = `<div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:13px; color:#374151;">Ctrl+L e depois</span>
+                <input type="number" min="0" step="1" value="${parseInt(s.value) || 0}" onchange="app.updateStep('${s.id}', 'value', this.value)" style="width:70px;">
+                <span style="font-size:13px; color:#374151;">Tab(s)</span>
+              </div>
+              <span style="font-size:12px; color:#6b7280;">📍 <strong>Início padrão:</strong> foca a barra de endereço (sempre o mesmo ponto) e entra na página com um nº fixo de Tabs. Coloque este passo <strong>logo após Abrir Site</strong>, assim toda execução começa do mesmo lugar.</span>
+            </div>`;
           }
 
-          const icon = s.type === 'key' ? '⌨️' : s.type === 'combo' ? '🎹' : s.type === 'type' ? '🔤' : s.type === 'wait' ? '⏱️' : s.type === 'site' ? '🌐' : s.type === 'focus' ? '🎯' : '🚀';
+          const icon = s.type === 'key' ? '⌨️' : s.type === 'combo' ? '🎹' : s.type === 'type' ? '🔤' : s.type === 'wait' ? '⏱️' : s.type === 'site' ? '🌐' : s.type === 'focus' ? '🎯' : s.type === 'anchor' ? '📍' : '🚀';
           const stepNumber = this.editingScript.steps.length - index;
 
           return `
@@ -1664,6 +1696,7 @@
                   <button onclick="app.addStep('run')">🚀 Abrir Programa</button>
                   <button onclick="app.addStep('site')">🌐 Abrir Site (Firefox)</button>
                   <button onclick="app.addStep('focus')">🎯 Focar Firefox</button>
+                  <button onclick="app.addStep('anchor')">📍 Início padrão (foco fixo)</button>
                 </div>
               </div>
               <div style="padding: 12px 20px; background: #f0fdf4; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between;">
