@@ -857,18 +857,29 @@
           return `<div class="form-group" style="margin:0;"><label>Data</label><input type="date" id="sch-date" value="${today}"></div>`;
         }
         if (freq === 'WEEKLY') {
-          return `<div class="form-group" style="margin:0;"><label>Dia da semana</label>
-            <select id="sch-weekday">
-              <option value="MON">Segunda-feira</option>
-              <option value="TUE">Terça-feira</option>
-              <option value="WED">Quarta-feira</option>
-              <option value="THU">Quinta-feira</option>
-              <option value="FRI">Sexta-feira</option>
-              <option value="SAT">Sábado</option>
-              <option value="SUN">Domingo</option>
-            </select></div>`;
+          const days = [['MON','Seg'],['TUE','Ter'],['WED','Qua'],['THU','Qui'],['FRI','Sex'],['SAT','Sáb'],['SUN','Dom']];
+          const uteis = ['MON','TUE','WED','THU','FRI'];
+          return `<div class="form-group" style="margin:0;"><label>Dias da semana (marque um ou mais)</label>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+              ${days.map(([v,l]) => `<label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer; width:auto; padding:6px 10px; border:1px solid var(--outline-variant); border-radius:8px; background:var(--surface);">
+                <input type="checkbox" class="sch-weekday" value="${v}" style="width:auto;" ${uteis.includes(v)?'checked':''}> ${l}</label>`).join('')}
+            </div></div>`;
         }
-        return `<div style="font-size:13px; color:#6b7280; padding-bottom:10px;">Vai rodar todos os dias no horário escolhido.</div>`;
+        if (freq === 'WEEKDAYS') {
+          return `<div style="font-size:13px; color:var(--on-surface-variant); padding-bottom:10px;">Vai rodar de <strong>segunda a sexta</strong> no horário escolhido (pula sábado e domingo).</div>`;
+        }
+        if (freq === 'MONTHLY') {
+          return `<div class="form-group" style="margin:0;"><label>Dia do mês</label>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <input type="number" id="sch-monthday" min="1" max="31" value="1" style="width:80px;">
+              <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer; width:auto;">
+                <input type="checkbox" id="sch-lastday" style="width:auto;" onchange="document.getElementById('sch-monthday').disabled=this.checked"> Último dia do mês
+              </label>
+            </div>
+            <span style="display:block; margin-top:6px; font-size:12px; color:var(--on-surface-variant);">Dias 29–31 podem pular meses curtos (ex.: fevereiro). Para fechamento, marque <strong>Último dia do mês</strong>.</span>
+          </div>`;
+        }
+        return `<div style="font-size:13px; color:var(--on-surface-variant); padding-bottom:10px;">Vai rodar todos os dias no horário escolhido.</div>`;
       },
       renderScheduleFields() {
         const freq = document.getElementById('sch-freq').value;
@@ -1016,6 +1027,7 @@
         let flags = '';
         let descricao = '';
         const weekdayPt = { MON: 'segunda', TUE: 'terca', WED: 'quarta', THU: 'quinta', FRI: 'sexta', SAT: 'sabado', SUN: 'domingo' };
+        const ordem = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
 
         if (freq === 'ONCE') {
           const dateIso = document.getElementById('sch-date').value;
@@ -1026,10 +1038,26 @@
         } else if (freq === 'DAILY') {
           flags = `/sc DAILY /st ${time}`;
           descricao = `todos os dias as ${time}`;
+        } else if (freq === 'WEEKDAYS') {
+          flags = `/sc WEEKLY /d MON,TUE,WED,THU,FRI /st ${time}`;
+          descricao = `de segunda a sexta as ${time}`;
         } else if (freq === 'WEEKLY') {
-          const wd = document.getElementById('sch-weekday').value;
-          flags = `/sc WEEKLY /d ${wd} /st ${time}`;
-          descricao = `toda ${weekdayPt[wd]} as ${time}`;
+          const dias = Array.from(document.querySelectorAll('.sch-weekday:checked')).map(c => c.value);
+          if (dias.length === 0) { alert('Marque pelo menos um dia da semana.'); return; }
+          dias.sort((a, b) => ordem.indexOf(a) - ordem.indexOf(b));
+          flags = `/sc WEEKLY /d ${dias.join(',')} /st ${time}`;
+          descricao = `toda ${dias.map(d => weekdayPt[d]).join(', ')} as ${time}`;
+        } else if (freq === 'MONTHLY') {
+          const lastday = document.getElementById('sch-lastday').checked;
+          if (lastday) {
+            flags = `/sc MONTHLY /mo LASTDAY /m JAN,FEB,MAR,APR,MAY,JUN,JUL,AUG,SEP,OCT,NOV,DEC /st ${time}`;
+            descricao = `todo ultimo dia do mes as ${time}`;
+          } else {
+            const dia = parseInt(document.getElementById('sch-monthday').value) || 0;
+            if (dia < 1 || dia > 31) { alert('Escolha um dia entre 1 e 31.'); return; }
+            flags = `/sc MONTHLY /d ${dia} /st ${time}`;
+            descricao = `todo dia ${dia} as ${time}`;
+          }
         }
 
         // .bat: textos sem acentos para evitar problemas de codificacao no console
@@ -1473,7 +1501,9 @@
                 <select id="sch-freq" onchange="app.renderScheduleFields()">
                   <option value="ONCE">Uma vez</option>
                   <option value="DAILY">Todos os dias</option>
-                  <option value="WEEKLY">Toda semana</option>
+                  <option value="WEEKDAYS">Dias úteis (seg a sex)</option>
+                  <option value="WEEKLY">Escolher dias da semana</option>
+                  <option value="MONTHLY">Dia do mês (mensal)</option>
                 </select>
               </div>
               <div id="sch-extra" style="flex:1; min-width:160px;">${this.scheduleExtraHtml('ONCE')}</div>
