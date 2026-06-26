@@ -868,6 +868,17 @@
         if (freq === 'WEEKDAYS') {
           return `<div style="font-size:13px; color:var(--on-surface-variant); padding-bottom:10px;">Vai rodar de <strong>segunda a sexta</strong> no horário escolhido (pula sábado e domingo).</div>`;
         }
+        if (freq === 'MONTHLY') {
+          return `<div class="form-group" style="margin:0;"><label>Dia do mês</label>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <input type="number" id="sch-monthday" min="1" max="31" value="1" style="width:80px;">
+              <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer; width:auto;">
+                <input type="checkbox" id="sch-lastday" style="width:auto;" onchange="document.getElementById('sch-monthday').disabled=this.checked"> Último dia do mês
+              </label>
+            </div>
+            <span style="display:block; margin-top:6px; font-size:12px; color:var(--on-surface-variant);">Dias 29–31 podem pular meses curtos (ex.: fevereiro). Para fechamento, marque <strong>Último dia do mês</strong>.</span>
+          </div>`;
+        }
         return `<div style="font-size:13px; color:var(--on-surface-variant); padding-bottom:10px;">Vai rodar todos os dias no horário escolhido.</div>`;
       },
       renderScheduleFields() {
@@ -1036,6 +1047,17 @@
           dias.sort((a, b) => ordem.indexOf(a) - ordem.indexOf(b));
           flags = `/sc WEEKLY /d ${dias.join(',')} /st ${time}`;
           descricao = `toda ${dias.map(d => weekdayPt[d]).join(', ')} as ${time}`;
+        } else if (freq === 'MONTHLY') {
+          const lastday = document.getElementById('sch-lastday').checked;
+          if (lastday) {
+            flags = `/sc MONTHLY /mo LASTDAY /m JAN,FEB,MAR,APR,MAY,JUN,JUL,AUG,SEP,OCT,NOV,DEC /st ${time}`;
+            descricao = `todo ultimo dia do mes as ${time}`;
+          } else {
+            const dia = parseInt(document.getElementById('sch-monthday').value) || 0;
+            if (dia < 1 || dia > 31) { alert('Escolha um dia entre 1 e 31.'); return; }
+            flags = `/sc MONTHLY /d ${dia} /st ${time}`;
+            descricao = `todo dia ${dia} as ${time}`;
+          }
         }
 
         // .bat: textos sem acentos para evitar problemas de codificacao no console
@@ -1481,6 +1503,7 @@
                   <option value="DAILY">Todos os dias</option>
                   <option value="WEEKDAYS">Dias úteis (seg a sex)</option>
                   <option value="WEEKLY">Escolher dias da semana</option>
+                  <option value="MONTHLY">Dia do mês (mensal)</option>
                 </select>
               </div>
               <div id="sch-extra" style="flex:1; min-width:160px;">${this.scheduleExtraHtml('ONCE')}</div>
