@@ -499,7 +499,7 @@
 
       // Funções de Passos
       addStep(type) {
-        // Adiciona o novo passo no INÍCIO do array (topo da lista)
+        // Adiciona o novo passo na posição selecionada pelo usuário
         const defaults = { wait:'1000', key:'Tab', combo:'Tab', run:'calc.exe', site:'https://www.cresol.com.br', focus:'Mozilla Firefox', anchor:'1' };
         const step = { id: this.generateId(), type, value: defaults[type] || '', description:'' };
         if (type === 'combo') { step.ctrl = false; step.alt = true; step.shift = false; } // começa como Alt+Tab
@@ -529,7 +529,8 @@
       updateStep(id, field, value) {
         const s = this.editingScript.steps.find(x => x.id === id);
         if (s) s[field] = value;
-        if (field === 'type' || (field === 'value' && s.type === 'key') || s.type === 'combo') this.renderCreator();
+        // Re-renderiza só quando muda algo que afeta o layout/prévia (não ao digitar descrição/pausa).
+        if (field === 'type' || (field === 'value' && s.type === 'key') || (s.type === 'combo' && field !== 'description' && field !== 'pause')) this.renderCreator();
       },
       moveStep(index, dir) {
         // dir: -1 (sobe na tela, vai para índice menor), 1 (desce na tela, vai para índice maior)
@@ -739,8 +740,7 @@
           vbs += `WScript.Sleep 3000\n\n`;
         }
 
-        // Executa os passos na ordem inversa (do último adicionado para o primeiro)
-        const stepsToExecute = [...script.steps].reverse();
+        const stepsToExecute = [...script.steps];
 
         // Em depuração, segue mesmo se um passo falhar, para registrar o erro no log
         if (debug) vbs += `On Error Resume Next\n`;
@@ -1261,7 +1261,7 @@
       },
 
       buildSimOps(script) {
-        const stepsExec = [...script.steps].reverse();
+        const stepsExec = [...script.steps];
         const hasLoop = script.loop && script.loop.enabled;
         const count = hasLoop ? (parseInt(script.loop.count) || 1) : 1;
         const ops = [];
@@ -1705,7 +1705,7 @@
           }
 
           const icon = s.type === 'key' ? '⌨️' : s.type === 'combo' ? '🎹' : s.type === 'type' ? '🔤' : s.type === 'wait' ? '⏱️' : s.type === 'site' ? '🌐' : s.type === 'focus' ? '🎯' : s.type === 'anchor' ? '📍' : '🚀';
-          const stepNumber = this.editingScript.steps.length - index;
+          const stepNumber = index + 1;
 
           return `
             <div class="step-card" draggable="true"
@@ -1771,6 +1771,10 @@
           </div>`;
         }
 
+        // Preserva a rolagem da lista de etapas para a tela não "pular" para o topo a cada mudança.
+        const prevStepsScroll = (document.querySelector('.steps-list') || {}).scrollTop || 0;
+        const prevLeftScroll = (document.querySelector('.col-left') || {}).scrollTop || 0;
+
         view.innerHTML = `
           <div class="creator-header">
             <h2 style="font-size:24px; color:#111827;">Criar / Editar Robô</h2>
@@ -1833,6 +1837,12 @@
             </div>
           </div>
         `;
+
+        // Restaura a rolagem onde o usuário estava (evita o "pulo" para o topo).
+        const newStepsList = document.querySelector('.steps-list');
+        if (newStepsList) newStepsList.scrollTop = prevStepsScroll;
+        const newLeft = document.querySelector('.col-left');
+        if (newLeft) newLeft.scrollTop = prevLeftScroll;
       }
     };
 
