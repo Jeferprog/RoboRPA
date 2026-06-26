@@ -64,12 +64,12 @@
     .nav-buttons button:hover { background-color: rgba(255,255,255,0.13); opacity: 1; }
 
     /* Layout Principal */
-    .container { max-width: 1280px; margin: 24px auto; display: flex; gap: 24px; flex: 1; width: 100%; padding: 0 24px; min-height: 0; }
+    .container { max-width: 1440px; margin: 16px auto; display: flex; gap: 24px; flex: 1; width: 100%; padding: 0 24px; min-height: 0; }
     .panel { background: var(--surface); border-radius: var(--radius-xl); box-shadow: var(--shadow-sm); border: 1px solid var(--outline-variant); display: flex; flex-direction: column; overflow: hidden; }
     .hidden { display: none !important; }
 
     /* Aba: Executar Robôs */
-    #runner-view { display: flex; width: 100%; gap: 24px; }
+    #runner-view, #settings-view { display: flex; width: 100%; gap: 24px; }
     .sidebar { width: 320px; flex-shrink: 0; display: flex; flex-direction: column; }
     .sidebar-header { padding: 16px 18px; background: var(--surface-bright); border-bottom: 1px solid var(--outline-variant); display: flex; justify-content: space-between; align-items: center; font-weight: 700; color: var(--on-surface); }
     .btn-icon { padding: 7px 12px; border-radius: var(--radius-lg); color: var(--primary); font-size: 13px; font-weight: 600; background: rgba(0,90,64,0.08); display: inline-flex; align-items: center; gap: 4px; }
@@ -109,10 +109,10 @@
     .btn-success:active { transform: scale(0.98); }
 
     /* Aba: Criar / Editar */
-    #creator-view { display: flex; width: 100%; padding: 24px; flex-direction: column; }
+    #creator-view { display: flex; width: 100%; padding: 16px 20px; flex-direction: column; }
     .creator-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--outline-variant); padding-bottom: 20px; margin-bottom: 24px; }
     .creator-columns { display: flex; gap: 32px; flex: 1; overflow: hidden; }
-    .col-left { width: 380px; display: flex; flex-direction: column; gap: 24px; overflow-y: auto; padding-right: 12px; }
+    .col-left { width: 330px; flex-shrink: 0; display: flex; flex-direction: column; gap: 24px; overflow-y: auto; padding-right: 12px; }
     .col-right { flex: 1; display: flex; flex-direction: column; background: var(--surface-bright); border: 1px solid var(--outline-variant); border-radius: var(--radius-xl); overflow: hidden; }
 
     .var-card { background: var(--surface); border: 1px solid var(--outline-variant); padding: 16px; border-radius: var(--radius-lg); margin-bottom: 16px; position: relative; box-shadow: var(--shadow-sm); }
@@ -127,7 +127,16 @@
     .steps-header { padding: 20px; background: var(--surface); border-bottom: 1px solid var(--outline-variant); display: flex; justify-content: space-between; align-items: center; }
     .steps-actions button { background: var(--surface-low); border: 1px solid var(--outline-variant); padding: 8px 14px; border-radius: var(--radius-lg); font-size: 13px; font-weight: 600; margin-left: 8px; color: var(--on-surface-variant); }
     .steps-actions button:hover { background: #e7f5ee; border-color: #a7e3c9; color: var(--primary); }
-    .steps-list { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+    .steps-list { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px; }
+
+    /* Ponto de inserção: escolher onde o novo passo entra */
+    .insert-point { display: flex; align-items: center; justify-content: center; min-height: 16px; cursor: pointer; opacity: 0.3; transition: opacity 0.15s; }
+    .insert-point:hover { opacity: 1; }
+    .insert-point.active { opacity: 1; }
+    .insert-point span { font-size: 11px; font-weight: 600; color: var(--primary); background: #e7f5ee; border: 1px dashed #a7e3c9; border-radius: 999px; padding: 1px 12px; line-height: 18px; }
+    .insert-point.active span { background: var(--primary); color: #fff; border-style: solid; border-color: var(--primary); }
+    .insert-point .line { flex: 1; height: 1px; background: transparent; }
+    .insert-point:hover .line, .insert-point.active .line { background: #a7e3c9; }
 
     .step-card { background: var(--surface); border: 1px solid var(--outline-variant); border-radius: var(--radius-xl); padding: 16px; display: flex; gap: 20px; align-items: center; box-shadow: var(--shadow-sm); transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s; }
     .step-card:hover { border-color: var(--outline); box-shadow: var(--shadow-md); }
@@ -188,6 +197,7 @@
     <div class="nav-buttons">
       <button id="tab-runner" class="active" onclick="app.switchTab('runner')"><span class="material-symbols-outlined" style="font-size:18px;">play_circle</span> Executar Robôs</button>
       <button id="tab-creator" onclick="app.switchTab('creator')"><span class="material-symbols-outlined" style="font-size:18px;">edit_square</span> Criar / Editar</button>
+      <button id="tab-settings" onclick="app.switchTab('settings')"><span class="material-symbols-outlined" style="font-size:18px;">settings</span> Configurações</button>
     </div>
   </div>
 
@@ -217,6 +227,17 @@
     <div id="creator-view" class="panel hidden">
       <!-- Conteúdo injetado via JS -->
     </div>
+
+    <!-- ABA: CONFIGURAÇÕES -->
+    <div id="settings-view" class="hidden">
+      <div class="panel sidebar">
+        <div class="sidebar-header">Meus Robôs</div>
+        <div class="script-list" id="settings-script-list"></div>
+      </div>
+      <div class="panel main-content" id="settings-content">
+        <!-- Conteúdo injetado via JS -->
+      </div>
+    </div>
   </div>
 
   <!-- =========================================
@@ -228,6 +249,7 @@
       activeTab: 'runner',
       selectedScriptId: null,
       editingScript: null,
+      insertAt: 0, // posição onde o próximo passo será inserido (índice no array)
       runVariables: {},
       sim: null,
       debugMode: false,
@@ -371,6 +393,7 @@
 
       startNewScript() {
         this.editingScript = { id: this.generateId(), name: 'Novo Robô', description: '', variables: [], steps: [] };
+        this.insertAt = 0;
         this.activeTab = 'creator';
         this.render();
       },
@@ -379,6 +402,7 @@
         const script = this.scripts.find(s => s.id === id);
         if (script) {
           this.editingScript = JSON.parse(JSON.stringify(script));
+          this.insertAt = 0;
           this.activeTab = 'creator';
           this.render();
         }
@@ -479,7 +503,14 @@
         const defaults = { wait:'1000', key:'Tab', combo:'Tab', run:'calc.exe', site:'https://www.cresol.com.br', focus:'Mozilla Firefox', anchor:'1' };
         const step = { id: this.generateId(), type, value: defaults[type] || '', description:'' };
         if (type === 'combo') { step.ctrl = false; step.alt = true; step.shift = false; } // começa como Alt+Tab
-        this.editingScript.steps.unshift(step);
+        // Insere no ponto escolhido pelo usuário (padrão: topo). Avança o ponto para manter a ordem.
+        const pos = Math.min(Math.max(0, this.insertAt || 0), this.editingScript.steps.length);
+        this.editingScript.steps.splice(pos, 0, step);
+        this.insertAt = pos + 1;
+        this.renderCreator();
+      },
+      setInsertAt(pos) {
+        this.insertAt = pos;
         this.renderCreator();
       },
       removeStep(id) {
@@ -1381,18 +1412,25 @@
       render() {
         document.getElementById('tab-runner').className = this.activeTab === 'runner' ? 'active' : '';
         document.getElementById('tab-creator').className = this.activeTab === 'creator' ? 'active' : '';
-        
+        document.getElementById('tab-settings').className = this.activeTab === 'settings' ? 'active' : '';
+
         const runnerView = document.getElementById('runner-view');
         const creatorView = document.getElementById('creator-view');
+        const settingsView = document.getElementById('settings-view');
 
-        if (this.activeTab === 'runner') {
-          runnerView.classList.remove('hidden');
-          creatorView.classList.add('hidden');
-          this.renderRunner();
-        } else {
-          runnerView.classList.add('hidden');
+        runnerView.classList.add('hidden');
+        creatorView.classList.add('hidden');
+        settingsView.classList.add('hidden');
+
+        if (this.activeTab === 'creator') {
           creatorView.classList.remove('hidden');
           this.renderCreator();
+        } else if (this.activeTab === 'settings') {
+          settingsView.classList.remove('hidden');
+          this.renderSettings();
+        } else {
+          runnerView.classList.remove('hidden');
+          this.renderRunner();
         }
       },
 
@@ -1476,21 +1514,57 @@
             </label>
           </div>
           <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
-            <button class="btn-success" onclick="app.openSimulator('${script.id}')" style="padding:14px 24px; font-size:15px;">
-              🧪 Testar (Simulação)
-            </button>
             <button class="btn-primary" onclick="app.downloadVBS('${script.id}')">
               ⬇️ Baixar Arquivo Executável (.vbs)
             </button>
-            <button class="btn-outline" onclick="app.downloadStopper()" title="Encerra na hora qualquer robô ou anti-ocioso em execução" style="color:#ef4444; border-color:#fecaca;">
-              ⛔ Baixar Parar Robô (.bat)
-            </button>
           </div>
-          <div style="font-size:12px; color:#6b7280; margin-top:10px; line-height:1.5;">
-            <strong>⛔ Parada de emergência:</strong> guarde o <strong>parar_robo.bat</strong> na Área de Trabalho. Se precisar interromper, dê um <strong>duplo clique</strong> nele — encerra na hora o robô <em>e</em> o anti-ocioso. (Se o teclado estiver travado pelo robô, aperte <strong>Ctrl+Alt+Del</strong> primeiro para liberar.)
+          <div style="font-size:13px; color:var(--on-surface-variant); margin-top:16px; background:var(--surface-bright); border:1px solid var(--outline-variant); border-radius:10px; padding:14px; line-height:1.6;">
+            💡 <strong>Testar a simulação</strong>, <strong>parar o robô</strong>, <strong>agendar a execução</strong> e os utilitários (anti-ocioso, diagnóstico) agora ficam na aba <strong>⚙️ Configurações</strong>.
+          </div>
+        `;
+      },
+
+      renderSettings() {
+        // Lista lateral de robôs (mesma da aba Executar)
+        const list = document.getElementById('settings-script-list');
+        if (this.scripts.length === 0) {
+          list.innerHTML = `<div class="empty-state"><p>Nenhum robô criado.</p></div>`;
+        } else {
+          list.innerHTML = this.scripts.map(s => `
+            <div class="script-item ${this.selectedScriptId === s.id ? 'active' : ''}" onclick="app.selectScript('${s.id}')">
+              <div class="script-item-title">${s.name}</div>
+              <div class="script-item-desc">${s.steps.length} passos</div>
+            </div>
+          `).join('');
+        }
+
+        const content = document.getElementById('settings-content');
+        const script = this.scripts.find(s => s.id === this.selectedScriptId);
+        if (!script) {
+          content.innerHTML = `<div class="empty-state" style="margin-top:100px; font-size:18px;">Selecione um robô na lista para configurar</div>`;
+          return;
+        }
+
+        content.innerHTML = `
+          <div class="script-header">
+            <div>
+              <div class="script-title">⚙️ Configurações — ${script.name}</div>
+              <div class="script-desc">Teste a simulação, agende a execução e gerencie os utilitários deste robô.</div>
+            </div>
           </div>
 
-          <div class="variables-section" style="margin-top:32px;">
+          <div class="variables-section">
+            <div class="variables-title">🧪 Testar e parar</div>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+              <button class="btn-success" onclick="app.openSimulator('${script.id}')" style="padding:14px 24px; font-size:15px;">🧪 Testar (Simulação)</button>
+              <button class="btn-outline" onclick="app.downloadStopper()" title="Encerra na hora qualquer robô ou anti-ocioso em execução" style="color:#ef4444; border-color:#fecaca;">⛔ Baixar Parar Robô (.bat)</button>
+            </div>
+            <div style="font-size:12px; color:var(--on-surface-variant); margin-top:12px; line-height:1.5;">
+              <strong>⛔ Parada de emergência:</strong> guarde o <strong>parar_robo.bat</strong> na Área de Trabalho. Se precisar interromper, dê um <strong>duplo clique</strong> nele — encerra na hora o robô <em>e</em> o anti-ocioso. (Se o teclado estiver travado pelo robô, aperte <strong>Ctrl+Alt+Del</strong> primeiro para liberar.)
+            </div>
+          </div>
+
+          <div class="variables-section" style="margin-top:24px;">
             <div class="variables-title">⏰ Agendar execução automática</div>
             <div style="font-size:13px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; padding:10px 12px; border-radius:8px; margin-bottom:20px;">
               ⚠️ No horário marcado o computador precisa estar <strong>ligado e desbloqueado</strong>, com a <strong>janela do sistema aberta</strong>. Como na execução manual, o robô digita na janela em foco — então o agendamento serve para <strong>iniciar o robô na hora certa</strong>, com você presente.
@@ -1518,7 +1592,7 @@
               <button class="btn-outline" onclick="app.downloadScheduleDiagnostic('${script.id}')" title="Descobre por que a tarefa agendada nao rodou">🔎 Diagnosticar agendamento (.bat)</button>
             </div>
             <div style="font-size:12px; color:#6b7280; margin-top:14px; line-height:1.5;">
-              <strong>Como usar:</strong> 1) Baixe o <strong>.vbs</strong> do robô (botão acima). 2) Salve o <strong>.bat</strong> na <strong>mesma pasta</strong> do .vbs. 3) Dê um <strong>duplo clique no .bat</strong> para criar o agendamento no Windows. Para desfazer, use o cancelador.
+              <strong>Como usar:</strong> 1) Baixe o <strong>.vbs</strong> do robô na aba <strong>Executar Robôs</strong>. 2) Salve o <strong>.bat</strong> na <strong>mesma pasta</strong> do .vbs. 3) Dê um <strong>duplo clique no .bat</strong> para criar o agendamento no Windows. Para desfazer, use o cancelador.
             </div>
 
             <div style="margin-top:24px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:16px;">
@@ -1582,7 +1656,7 @@
           varsHtml = `<div class="empty-state" style="padding:20px;">Nenhuma variável criada.</div>`;
         }
 
-        let stepsHtml = this.editingScript.steps.map((s, index) => {
+        const stepCards = this.editingScript.steps.map((s, index) => {
           let inputHtml = '';
           if (s.type === 'key') {
             inputHtml = `<select onchange="app.updateStep('${s.id}', 'value', this.value)">
@@ -1668,10 +1742,18 @@
               </div>
             </div>
           `;
-        }).join('');
+        });
 
-        if (this.editingScript.steps.length === 0) {
+        // Ponto de inserção: o usuário clica onde o próximo passo deve entrar.
+        const insertAt = Math.min(Math.max(0, this.insertAt || 0), this.editingScript.steps.length);
+        this.insertAt = insertAt;
+        const divider = (pos) => `<div class="insert-point ${insertAt === pos ? 'active' : ''}" onclick="app.setInsertAt(${pos})" title="Inserir os próximos passos aqui"><span class="line"></span><span>${insertAt === pos ? '▼ os novos passos entram aqui' : '+ inserir aqui'}</span><span class="line"></span></div>`;
+
+        let stepsHtml;
+        if (stepCards.length === 0) {
           stepsHtml = `<div class="empty-state">Nenhum passo adicionado. Use os botões acima.</div>`;
+        } else {
+          stepsHtml = divider(0) + stepCards.map((c, i) => c + divider(i + 1)).join('');
         }
 
         let tipsHtml = '';
@@ -1717,7 +1799,10 @@
             </div>
             <div class="col-right">
               <div class="steps-header">
-                <h3 style="font-size:16px; color:#111827;">Passos do Robô</h3>
+                <div>
+                  <h3 style="font-size:16px; color:#111827;">Passos do Robô</h3>
+                  <p style="font-size:12px; color:#6b7280; margin-top:2px;">💡 Clique em <strong>“+ inserir aqui”</strong> entre os passos para escolher onde o próximo será adicionado.</p>
+                </div>
                 <div class="steps-actions">
                   <button onclick="app.addStep('key')">⌨️ Tecla</button>
                   <button onclick="app.addStep('combo')">🎹 Combinação (2 teclas)</button>
