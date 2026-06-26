@@ -529,7 +529,8 @@
       updateStep(id, field, value) {
         const s = this.editingScript.steps.find(x => x.id === id);
         if (s) s[field] = value;
-        if (field === 'type' || (field === 'value' && s.type === 'key') || s.type === 'combo') this.renderCreator();
+        // Re-renderiza só quando muda algo que afeta o layout/prévia (não ao digitar descrição/pausa).
+        if (field === 'type' || (field === 'value' && s.type === 'key') || (s.type === 'combo' && field !== 'description' && field !== 'pause')) this.renderCreator();
       },
       moveStep(index, dir) {
         // dir: -1 (sobe na tela, vai para índice menor), 1 (desce na tela, vai para índice maior)
@@ -1771,6 +1772,10 @@
           </div>`;
         }
 
+        // Preserva a rolagem da lista de etapas para a tela não "pular" para o topo a cada mudança.
+        const prevStepsScroll = (document.querySelector('.steps-list') || {}).scrollTop || 0;
+        const prevLeftScroll = (document.querySelector('.col-left') || {}).scrollTop || 0;
+
         view.innerHTML = `
           <div class="creator-header">
             <h2 style="font-size:24px; color:#111827;">Criar / Editar Robô</h2>
@@ -1833,6 +1838,12 @@
             </div>
           </div>
         `;
+
+        // Restaura a rolagem onde o usuário estava (evita o "pulo" para o topo).
+        const newStepsList = document.querySelector('.steps-list');
+        if (newStepsList) newStepsList.scrollTop = prevStepsScroll;
+        const newLeft = document.querySelector('.col-left');
+        if (newLeft) newLeft.scrollTop = prevLeftScroll;
       }
     };
 
