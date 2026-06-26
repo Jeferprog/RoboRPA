@@ -499,7 +499,7 @@
 
       // Funções de Passos
       addStep(type) {
-        // Adiciona o novo passo no INÍCIO do array (topo da lista)
+        // Adiciona o novo passo na posição selecionada pelo usuário
         const defaults = { wait:'1000', key:'Tab', combo:'Tab', run:'calc.exe', site:'https://www.cresol.com.br', focus:'Mozilla Firefox', anchor:'1' };
         const step = { id: this.generateId(), type, value: defaults[type] || '', description:'' };
         if (type === 'combo') { step.ctrl = false; step.alt = true; step.shift = false; } // começa como Alt+Tab
@@ -740,8 +740,7 @@
           vbs += `WScript.Sleep 3000\n\n`;
         }
 
-        // Executa os passos na ordem inversa (do último adicionado para o primeiro)
-        const stepsToExecute = [...script.steps].reverse();
+        const stepsToExecute = [...script.steps];
 
         // Em depuração, segue mesmo se um passo falhar, para registrar o erro no log
         if (debug) vbs += `On Error Resume Next\n`;
@@ -1262,7 +1261,7 @@
       },
 
       buildSimOps(script) {
-        const stepsExec = [...script.steps].reverse();
+        const stepsExec = [...script.steps];
         const hasLoop = script.loop && script.loop.enabled;
         const count = hasLoop ? (parseInt(script.loop.count) || 1) : 1;
         const ops = [];
@@ -1706,7 +1705,7 @@
           }
 
           const icon = s.type === 'key' ? '⌨️' : s.type === 'combo' ? '🎹' : s.type === 'type' ? '🔤' : s.type === 'wait' ? '⏱️' : s.type === 'site' ? '🌐' : s.type === 'focus' ? '🎯' : s.type === 'anchor' ? '📍' : '🚀';
-          const stepNumber = this.editingScript.steps.length - index;
+          const stepNumber = index + 1;
 
           return `
             <div class="step-card" draggable="true"
