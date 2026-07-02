@@ -1061,13 +1061,7 @@
         bat += `echo [1/4] Reiniciando adaptador de rede...\r\n`;
         bat += `echo.\r\n`;
         bat += `:: Tenta PowerShell primeiro (mais confiavel)\r\n`;
-        bat += `powershell -NoProfile -ExecutionPolicy Bypass -Command ^\r\n`;
-        bat += `  "$adapters = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -or $_.Status -eq 'Disconnected' };^\r\n`;
-        bat += `   foreach ($a in $adapters) {^\r\n`;
-        bat += `     Write-Host ('  Reiniciando: ' + $a.Name + ' (' + $a.InterfaceDescription + ')');^\r\n`;
-        bat += `     Restart-NetAdapter -Name $a.Name -Confirm:$false;^\r\n`;
-        bat += `   }^\r\n`;
-        bat += `  " 2>nul\r\n`;
+        bat += `powershell -NoProfile -ExecutionPolicy Bypass -Command "$adapters = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -or $_.Status -eq 'Disconnected' }; foreach ($a in $adapters) { Write-Host ('  Reiniciando: ' + $a.Name + ' (' + $a.InterfaceDescription + ')'); Restart-NetAdapter -Name $a.Name -Confirm:$false }" 2>nul\r\n`;
         bat += `if %errorlevel% neq 0 (\r\n`;
         bat += `  echo   PowerShell falhou, tentando via netsh...\r\n`;
         bat += `  for /f "tokens=*" %%i in ('netsh interface show interface ^| findstr /i "Connected Disconnected"') do (\r\n`;
