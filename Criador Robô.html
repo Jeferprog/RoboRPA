@@ -1046,6 +1046,169 @@
         a.click();
         URL.revokeObjectURL(url);
       },
+
+      downloadNetPrepare() {
+        let bat = `@echo off\r\n`;
+        bat += `chcp 1252 >nul\r\n`;
+        bat += `title Preparacao de rede e servicos - Cresol RPA\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo ============================================================\r\n`;
+        bat += `echo   Preparacao de rede e servicos - Cresol RPA\r\n`;
+        bat += `echo ============================================================\r\n`;
+        bat += `echo.\r\n`;
+        bat += `\r\n`;
+        bat += `:: ---- 1. Reiniciar adaptador de rede ----\r\n`;
+        bat += `echo [1/4] Reiniciando adaptador de rede...\r\n`;
+        bat += `echo.\r\n`;
+        bat += `:: Tenta PowerShell primeiro (mais confiavel)\r\n`;
+        bat += `powershell -NoProfile -ExecutionPolicy Bypass -Command ^\r\n`;
+        bat += `  "$adapters = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -or $_.Status -eq 'Disconnected' };^\r\n`;
+        bat += `   foreach ($a in $adapters) {^\r\n`;
+        bat += `     Write-Host ('  Reiniciando: ' + $a.Name + ' (' + $a.InterfaceDescription + ')');^\r\n`;
+        bat += `     Restart-NetAdapter -Name $a.Name -Confirm:$false;^\r\n`;
+        bat += `   }^\r\n`;
+        bat += `  " 2>nul\r\n`;
+        bat += `if %errorlevel% neq 0 (\r\n`;
+        bat += `  echo   PowerShell falhou, tentando via netsh...\r\n`;
+        bat += `  for /f "tokens=*" %%i in ('netsh interface show interface ^| findstr /i "Connected Disconnected"') do (\r\n`;
+        bat += `    for /f "tokens=4*" %%a in ("%%i") do (\r\n`;
+        bat += `      echo   Reiniciando: %%a %%b\r\n`;
+        bat += `      netsh interface set interface "%%a %%b" disabled >nul 2>&1\r\n`;
+        bat += `      timeout /t 2 >nul\r\n`;
+        bat += `      netsh interface set interface "%%a %%b" enabled >nul 2>&1\r\n`;
+        bat += `    )\r\n`;
+        bat += `  )\r\n`;
+        bat += `)\r\n`;
+        bat += `echo.\r\n`;
+        bat += `\r\n`;
+        bat += `:: ---- 2. Aguardar conectividade ----\r\n`;
+        bat += `echo [2/4] Aguardando conexao com a rede...\r\n`;
+        bat += `set /a tentativa=0\r\n`;
+        bat += `:aguardar_rede\r\n`;
+        bat += `set /a tentativa+=1\r\n`;
+        bat += `ping -n 1 -w 2000 8.8.8.8 >nul 2>&1\r\n`;
+        bat += `if %errorlevel%==0 (\r\n`;
+        bat += `  echo   Rede OK ^(tentativa %tentativa%^)\r\n`;
+        bat += `  goto rede_ok\r\n`;
+        bat += `)\r\n`;
+        bat += `if %tentativa% lss 30 (\r\n`;
+        bat += `  echo   Sem conexao ainda... tentativa %tentativa%/30\r\n`;
+        bat += `  timeout /t 3 >nul\r\n`;
+        bat += `  goto aguardar_rede\r\n`;
+        bat += `)\r\n`;
+        bat += `echo   AVISO: Nao conseguiu conectar apos 30 tentativas.\r\n`;
+        bat += `echo   O robo pode falhar em passos que precisam de rede.\r\n`;
+        bat += `:rede_ok\r\n`;
+        bat += `echo.\r\n`;
+        bat += `\r\n`;
+        bat += `:: ---- 3. Reiniciar Cisco Secure Client ----\r\n`;
+        bat += `echo [3/4] Verificando Cisco Secure Client...\r\n`;
+        bat += `tasklist /fi "imagename eq vpnui.exe" 2>nul | findstr /i "vpnui" >nul 2>&1\r\n`;
+        bat += `if %errorlevel%==0 (\r\n`;
+        bat += `  echo   Cisco Secure Client detectado, reiniciando...\r\n`;
+        bat += `  taskkill /f /im vpnui.exe >nul 2>&1\r\n`;
+        bat += `  taskkill /f /im vpnagentd.exe >nul 2>&1\r\n`;
+        bat += `  timeout /t 3 >nul\r\n`;
+        bat += `  if exist "C:\\Program Files (x86)\\Cisco\\Cisco Secure Client\\UI\\vpnui.exe" (\r\n`;
+        bat += `    start "" "C:\\Program Files (x86)\\Cisco\\Cisco Secure Client\\UI\\vpnui.exe"\r\n`;
+        bat += `    echo   Cisco reiniciado.\r\n`;
+        bat += `  ) else if exist "C:\\Program Files (x86)\\Cisco\\Cisco AnyConnect Secure Mobility Client\\vpnui.exe" (\r\n`;
+        bat += `    start "" "C:\\Program Files (x86)\\Cisco\\Cisco AnyConnect Secure Mobility Client\\vpnui.exe"\r\n`;
+        bat += `    echo   Cisco reiniciado.\r\n`;
+        bat += `  ) else (\r\n`;
+        bat += `    echo   Executavel do Cisco nao encontrado no caminho padrao.\r\n`;
+        bat += `    echo   Se necessario, abra manualmente.\r\n`;
+        bat += `  )\r\n`;
+        bat += `) else (\r\n`;
+        bat += `  echo   Cisco Secure Client nao esta rodando ^(pulando^).\r\n`;
+        bat += `)\r\n`;
+        bat += `echo.\r\n`;
+        bat += `\r\n`;
+        bat += `:: ---- 4. Reiniciar Google Drive ----\r\n`;
+        bat += `echo [4/4] Verificando Google Drive...\r\n`;
+        bat += `tasklist /fi "imagename eq GoogleDriveFS.exe" 2>nul | findstr /i "GoogleDriveFS" >nul 2>&1\r\n`;
+        bat += `if %errorlevel%==0 (\r\n`;
+        bat += `  echo   Google Drive detectado, reiniciando...\r\n`;
+        bat += `  taskkill /f /im GoogleDriveFS.exe >nul 2>&1\r\n`;
+        bat += `  timeout /t 3 >nul\r\n`;
+        bat += `)\r\n`;
+        bat += `:: Inicia o Google Drive (mesmo se nao estava rodando)\r\n`;
+        bat += `if exist "%ProgramFiles%\\Google\\Drive File Stream\\launch.bat" (\r\n`;
+        bat += `  start "" "%ProgramFiles%\\Google\\Drive File Stream\\launch.bat"\r\n`;
+        bat += `  echo   Google Drive iniciado.\r\n`;
+        bat += `) else if exist "%LocalAppData%\\Google\\GoogleDriveFS\\GoogleDriveFS.exe" (\r\n`;
+        bat += `  start "" "%LocalAppData%\\Google\\GoogleDriveFS\\GoogleDriveFS.exe"\r\n`;
+        bat += `  echo   Google Drive iniciado.\r\n`;
+        bat += `) else (\r\n`;
+        bat += `  echo   Google Drive nao encontrado no caminho padrao.\r\n`;
+        bat += `  echo   Se necessario, abra manualmente.\r\n`;
+        bat += `)\r\n`;
+        bat += `echo.\r\n`;
+        bat += `\r\n`;
+        bat += `echo ============================================================\r\n`;
+        bat += `echo   Preparacao concluida!\r\n`;
+        bat += `echo ============================================================\r\n`;
+        bat += `echo.\r\n`;
+        bat += `timeout /t 5 >nul\r\n`;
+
+        const blob = new Blob([bat], { type: 'application/bat;charset=windows-1252' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'preparar_rede.bat';
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+
+      downloadNicPowerFix() {
+        let ps = `# Desabilitar gerenciamento de energia dos adaptadores de rede\r\n`;
+        ps += `# Isso impede o Windows de desligar o adaptador para economizar energia\r\n`;
+        ps += `# Execute UMA VEZ como Administrador\r\n`;
+        ps += `\r\n`;
+        ps += `$adapters = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' }\r\n`;
+        ps += `foreach ($adapter in $adapters) {\r\n`;
+        ps += `    Write-Host "Processando: $($adapter.Name) ($($adapter.InterfaceDescription))"\r\n`;
+        ps += `    \r\n`;
+        ps += `    # Desabilitar "Allow the computer to turn off this device to save power"\r\n`;
+        ps += `    $pnpDevice = Get-PnpDevice | Where-Object { $_.FriendlyName -eq $adapter.InterfaceDescription }\r\n`;
+        ps += `    if ($pnpDevice) {\r\n`;
+        ps += `        $propPath = "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002bE10318}"\r\n`;
+        ps += `        $subKeys = Get-ChildItem $propPath -ErrorAction SilentlyContinue\r\n`;
+        ps += `        foreach ($key in $subKeys) {\r\n`;
+        ps += `            $desc = (Get-ItemProperty $key.PSPath -ErrorAction SilentlyContinue).DriverDesc\r\n`;
+        ps += `            if ($desc -eq $adapter.InterfaceDescription) {\r\n`;
+        ps += `                # PnPCapabilities: 0x18 (24) = desabilita power management\r\n`;
+        ps += `                Set-ItemProperty -Path $key.PSPath -Name 'PnPCapabilities' -Value 24 -Type DWord -Force\r\n`;
+        ps += `                Write-Host "  Power management DESABILITADO para: $desc" -ForegroundColor Green\r\n`;
+        ps += `            }\r\n`;
+        ps += `        }\r\n`;
+        ps += `    }\r\n`;
+        ps += `    \r\n`;
+        ps += `    # Desabilitar Energy Efficient Ethernet e Green Ethernet se suportados\r\n`;
+        ps += `    $params = @('EEELinkAdvertisement','*EEE','ReduceSpeedOnPowerDown','EnableGreenEthernet','AutoPowerSaveModeEnabled')\r\n`;
+        ps += `    foreach ($param in $params) {\r\n`;
+        ps += `        $adv = Get-NetAdapterAdvancedProperty -Name $adapter.Name -RegistryKeyword $param -ErrorAction SilentlyContinue\r\n`;
+        ps += `        if ($adv) {\r\n`;
+        ps += `            Set-NetAdapterAdvancedProperty -Name $adapter.Name -RegistryKeyword $param -RegistryValue 0 -ErrorAction SilentlyContinue\r\n`;
+        ps += `            Write-Host "  $param DESABILITADO" -ForegroundColor Yellow\r\n`;
+        ps += `        }\r\n`;
+        ps += `    }\r\n`;
+        ps += `}\r\n`;
+        ps += `\r\n`;
+        ps += `Write-Host ""\r\n`;
+        ps += `Write-Host "Concluido! Reinicie o computador para aplicar todas as alteracoes." -ForegroundColor Cyan\r\n`;
+        ps += `Write-Host "Pressione qualquer tecla para sair..."\r\n`;
+        ps += `$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')\r\n`;
+
+        const blob = new Blob([ps], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'desabilitar_poweroff_rede.ps1';
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+
       downloadScheduler(id) {
         const script = this.scripts.find(s => s.id === id);
         if (!script) return;
@@ -1621,6 +1784,46 @@
                 <strong>Como usar:</strong> clique com o botão direito no <strong>diagnostico_desligamento.bat</strong> →
                 <strong>Executar como administrador</strong>. Ele abre um relatório na Área de Trabalho. Me envie o
                 conteúdo que eu te explico o que aconteceu.
+              </div>
+            </div>
+          </div>
+
+          <div class="variables-section" style="margin-top:24px;">
+            <div class="variables-title">🔌 Preparação de rede e serviços</div>
+            <div style="font-size:13px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; padding:10px 12px; border-radius:8px; margin-bottom:20px;">
+              ⚠️ Se a máquina fica em espera por muitas horas (ex: de um dia para o outro com o anti-ocioso), o
+              <strong>adaptador de rede pode parar de responder</strong> e o <strong>Google Drive pode parar de sincronizar</strong>.
+              Use os scripts abaixo para corrigir automaticamente.
+            </div>
+
+            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:16px; margin-bottom:16px;">
+              <div style="font-weight:bold; color:#166534; margin-bottom:8px;">🔄 Script de preparação (usar antes do robô)</div>
+              <div style="font-size:13px; color:#14532d; line-height:1.6; margin-bottom:14px;">
+                Reinicia o adaptador de rede, aguarda a conexão voltar, reinicia o Cisco Secure Client
+                (se estiver rodando) e reinicia o Google Drive. <strong>Agende para rodar 5 minutos antes
+                do horário do robô</strong>, ou execute manualmente quando a rede não estiver respondendo.
+              </div>
+              <button class="btn-success" onclick="app.downloadNetPrepare()">⬇️ Baixar preparar_rede.bat</button>
+              <div style="font-size:12px; color:#6b7280; margin-top:12px; line-height:1.5;">
+                <strong>Como usar:</strong> clique com o botão direito → <strong>Executar como administrador</strong>
+                (necessário para reiniciar o adaptador de rede). Para agendar automaticamente, crie uma tarefa no
+                Agendador de Tarefas do Windows para rodar este .bat alguns minutos antes do horário do robô, com
+                <strong>"Executar com privilégios mais altos"</strong> marcado.
+              </div>
+            </div>
+
+            <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:10px; padding:16px;">
+              <div style="font-weight:bold; color:#92400e; margin-bottom:8px;">⚡ Correção permanente: desabilitar economia de energia da rede</div>
+              <div style="font-size:13px; color:#78350f; line-height:1.6; margin-bottom:14px;">
+                O Windows pode <strong>desligar o adaptador de rede para economizar energia</strong>, mesmo com
+                o anti-ocioso ativo. Este script PowerShell desabilita essa opção <strong>de forma permanente</strong>.
+                Execute <strong>apenas uma vez</strong> como administrador — a configuração persiste após reiniciar.
+              </div>
+              <button class="btn-primary" onclick="app.downloadNicPowerFix()" style="background:#d97706;">⬇️ Baixar desabilitar_poweroff_rede.ps1</button>
+              <div style="font-size:12px; color:#6b7280; margin-top:12px; line-height:1.5;">
+                <strong>Como usar:</strong> clique com o botão direito no arquivo → <strong>Executar com o PowerShell</strong>
+                (como Administrador). Depois <strong>reinicie o computador</strong> para aplicar. Se o PowerShell bloquear
+                a execução, rode: <code style="background:#f3f4f6; padding:2px 6px; border-radius:4px;">Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned</code>
               </div>
             </div>
           </div>
