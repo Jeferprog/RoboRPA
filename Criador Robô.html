@@ -1134,7 +1134,7 @@
         bat += `)\r\n`;
         bat += `:: Inicia o Google Drive (mesmo se nao estava rodando)\r\n`;
         bat += `if exist "%ProgramFiles%\\Google\\Drive File Stream\\launch.bat" (\r\n`;
-        bat += `  start "" "%ProgramFiles%\\Google\\Drive File Stream\\launch.bat"\r\n`;
+        bat += `  start "" cmd /c "%ProgramFiles%\\Google\\Drive File Stream\\launch.bat"\r\n`;
         bat += `  echo   Google Drive iniciado.\r\n`;
         bat += `) else if exist "%LocalAppData%\\Google\\GoogleDriveFS\\GoogleDriveFS.exe" (\r\n`;
         bat += `  start "" "%LocalAppData%\\Google\\GoogleDriveFS\\GoogleDriveFS.exe"\r\n`;
@@ -1148,8 +1148,7 @@
         bat += `echo ============================================================\r\n`;
         bat += `echo   Preparacao concluida!\r\n`;
         bat += `echo ============================================================\r\n`;
-        bat += `echo.\r\n`;
-        bat += `timeout /t 5 >nul\r\n`;
+        bat += `exit\r\n`;
 
         const blob = new Blob([bat], { type: 'application/bat;charset=windows-1252' });
         const url = URL.createObjectURL(blob);
