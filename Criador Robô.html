@@ -781,12 +781,12 @@
             vbs += `${indent}WshShell.Run "${step.value.replace(/"/g, '""')}" ' ${step.description}\n`;
             vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
           } else if (step.type === 'site') {
-            // Abre o endereço no Firefox (caminhos declarados no topo). Se não existir, usa o navegador padrão.
+            // Abre o endereço no Firefox com perfil RoboRPA (caminhos declarados no topo). Se não existir, usa o navegador padrão.
             const url = (step.value || '').replace(/"/g, '""');
             vbs += `${indent}If ffFso.FileExists(ff64) Then ' ${step.description}\n`;
-            vbs += `${indent}  WshShell.Run """" & ff64 & """ -new-window ""${url}"""\n`;
+            vbs += `${indent}  WshShell.Run """" & ff64 & """ -P ""RoboRPA"" -new-window ""${url}"""\n`;
             vbs += `${indent}ElseIf ffFso.FileExists(ff32) Then\n`;
-            vbs += `${indent}  WshShell.Run """" & ff32 & """ -new-window ""${url}"""\n`;
+            vbs += `${indent}  WshShell.Run """" & ff32 & """ -P ""RoboRPA"" -new-window ""${url}"""\n`;
             vbs += `${indent}Else\n`;
             vbs += `${indent}  WshShell.Run """${url}"""\n`;
             vbs += `${indent}End If\n`;
@@ -1224,6 +1224,142 @@
         const a = document.createElement('a');
         a.href = url;
         a.download = 'desabilitar_poweroff_rede.ps1';
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+
+      downloadFirefoxProfile() {
+        let bat = `@echo off\r\n`;
+        bat += `chcp 65001 >nul\r\n`;
+        bat += `title Configurar perfil Firefox para RoboRPA\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo ============================================================\r\n`;
+        bat += `echo   Configurar perfil Firefox dedicado para o RoboRPA\r\n`;
+        bat += `echo ============================================================\r\n`;
+        bat += `echo.\r\n`;
+        bat += `\r\n`;
+        bat += `:: Localizar Firefox\r\n`;
+        bat += `set "FF="\r\n`;
+        bat += `if exist "C:\\Program Files\\Mozilla Firefox\\firefox.exe" set "FF=C:\\Program Files\\Mozilla Firefox\\firefox.exe"\r\n`;
+        bat += `if exist "C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe" set "FF=C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe"\r\n`;
+        bat += `if "%FF%"=="" (\r\n`;
+        bat += `  echo   ERRO: Firefox nao encontrado.\r\n`;
+        bat += `  pause\r\n`;
+        bat += `  exit /b 1\r\n`;
+        bat += `)\r\n`;
+        bat += `echo   Firefox encontrado: %FF%\r\n`;
+        bat += `echo.\r\n`;
+        bat += `\r\n`;
+        bat += `:: Criar o perfil RoboRPA\r\n`;
+        bat += `echo [1/2] Criando perfil "RoboRPA"...\r\n`;
+        bat += `"%FF%" -CreateProfile "RoboRPA" 2>nul\r\n`;
+        bat += `timeout /t 2 >nul\r\n`;
+        bat += `echo   Perfil criado.\r\n`;
+        bat += `echo.\r\n`;
+        bat += `\r\n`;
+        bat += `:: Localizar a pasta do perfil\r\n`;
+        bat += `echo [2/2] Aplicando configuracoes anti-distracao...\r\n`;
+        bat += `set "PROF_DIR="\r\n`;
+        bat += `for /f "tokens=*" %%d in ('dir /b /ad "%APPDATA%\\Mozilla\\Firefox\\Profiles" 2^>nul ^| findstr /i "RoboRPA"') do (\r\n`;
+        bat += `  set "PROF_DIR=%APPDATA%\\Mozilla\\Firefox\\Profiles\\%%d"\r\n`;
+        bat += `)\r\n`;
+        bat += `if "%PROF_DIR%"=="" (\r\n`;
+        bat += `  echo   ERRO: Pasta do perfil RoboRPA nao encontrada.\r\n`;
+        bat += `  echo   Tente abrir o Firefox manualmente com:  "%FF%" -P\r\n`;
+        bat += `  pause\r\n`;
+        bat += `  exit /b 1\r\n`;
+        bat += `)\r\n`;
+        bat += `echo   Pasta do perfil: %PROF_DIR%\r\n`;
+        bat += `\r\n`;
+        bat += `:: Gravar user.js com todas as configuracoes\r\n`;
+        bat += `(\r\n`;
+        bat += `echo // ==========================================================\r\n`;
+        bat += `echo // Perfil Firefox dedicado para RoboRPA\r\n`;
+        bat += `echo // Desabilita tudo que pode desviar a automacao\r\n`;
+        bat += `echo // ==========================================================\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo // --- Inicializacao limpa ---\r\n`;
+        bat += `echo user_pref^("browser.startup.page", 0^);                          // Pagina em branco ao abrir\r\n`;
+        bat += `echo user_pref^("browser.startup.homepage_override.mstone", "ignore"^); // Nao mostra novidades apos update\r\n`;
+        bat += `echo user_pref^("browser.startup.firstrunSkipsHomepage", true^);       // Pula tela de boas-vindas\r\n`;
+        bat += `echo user_pref^("browser.aboutwelcome.enabled", false^);               // Desabilita pagina de boas-vindas\r\n`;
+        bat += `echo user_pref^("browser.startup.upgradeDialog.enabled", false^);      // Sem dialogo de upgrade\r\n`;
+        bat += `echo user_pref^("startup.homepage_welcome_url", ""^);                  // Sem URL de boas-vindas\r\n`;
+        bat += `echo user_pref^("startup.homepage_welcome_url.additional", ""^);       // Sem URL adicional\r\n`;
+        bat += `echo user_pref^("startup.homepage_override_url", ""^);                 // Sem override de homepage\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo // --- Restauracao de sessao ---\r\n`;
+        bat += `echo user_pref^("browser.sessionstore.resume_from_crash", false^);     // Nao restaura abas apos crash\r\n`;
+        bat += `echo user_pref^("browser.sessionstore.max_resumed_crashes", 0^);       // Zero tentativas de restaurar\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo // --- Atualizacoes ---\r\n`;
+        bat += `echo user_pref^("app.update.enabled", false^);                         // Sem atualizacao automatica\r\n`;
+        bat += `echo user_pref^("app.update.auto", false^);                            // Sem download automatico\r\n`;
+        bat += `echo user_pref^("app.update.silent", true^);                           // Atualiza silenciosamente se atualizar\r\n`;
+        bat += `echo user_pref^("app.update.doorhanger", false^);                      // Sem notificacao de update\r\n`;
+        bat += `echo user_pref^("extensions.update.enabled", false^);                  // Sem update de extensoes\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo // --- Popups e notificacoes ---\r\n`;
+        bat += `echo user_pref^("dom.webnotifications.enabled", false^);               // Sem notificacoes web\r\n`;
+        bat += `echo user_pref^("permissions.default.desktop-notification", 2^);       // Bloqueia pedidos de notificacao\r\n`;
+        bat += `echo user_pref^("dom.push.enabled", false^);                           // Sem push notifications\r\n`;
+        bat += `echo user_pref^("browser.shell.checkDefaultBrowser", false^);          // Sem pergunta de navegador padrao\r\n`;
+        bat += `echo user_pref^("browser.shell.didSkipDefaultBrowserCheckOnFirstRun", true^);\r\n`;
+        bat += `echo user_pref^("browser.defaultbrowser.notificationbar", false^);     // Sem barra de navegador padrao\r\n`;
+        bat += `echo user_pref^("browser.tabs.warnOnClose", false^);                   // Sem aviso ao fechar abas\r\n`;
+        bat += `echo user_pref^("browser.tabs.warnOnCloseOtherTabs", false^);          // Sem aviso ao fechar outras abas\r\n`;
+        bat += `echo user_pref^("browser.tabs.warnOnOpen", false^);                    // Sem aviso ao abrir muitas abas\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo // --- Importacao e migração ---\r\n`;
+        bat += `echo user_pref^("browser.migrate.automigrate.enabled", false^);        // Sem migrar de outro navegador\r\n`;
+        bat += `echo user_pref^("browser.migrate.showBookmarksToolbarAfterMigration", false^);\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo // --- Interface limpa ---\r\n`;
+        bat += `echo user_pref^("browser.newtabpage.enabled", false^);                 // Nova aba = em branco\r\n`;
+        bat += `echo user_pref^("browser.newtabpage.activity-stream.feeds.section.topstories", false^);\r\n`;
+        bat += `echo user_pref^("browser.newtabpage.activity-stream.feeds.snippets", false^);\r\n`;
+        bat += `echo user_pref^("browser.newtabpage.activity-stream.feeds.topsites", false^);\r\n`;
+        bat += `echo user_pref^("browser.newtabpage.activity-stream.showSearch", false^);\r\n`;
+        bat += `echo user_pref^("browser.newtabpage.activity-stream.showSponsored", false^);\r\n`;
+        bat += `echo user_pref^("browser.newtabpage.activity-stream.showSponsoredTopSites", false^);\r\n`;
+        bat += `echo user_pref^("browser.newtabpage.activity-stream.feeds.recommendationprovider", false^);\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo // --- Pocket e extensoes embutidas ---\r\n`;
+        bat += `echo user_pref^("extensions.pocket.enabled", false^);                  // Desabilita Pocket\r\n`;
+        bat += `echo user_pref^("identity.fxaccounts.enabled", false^);                // Sem Firefox Account sync\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo // --- Traducao e dicas ---\r\n`;
+        bat += `echo user_pref^("browser.translations.automaticallyPopup", false^);    // Sem popup de traducao\r\n`;
+        bat += `echo user_pref^("browser.uitour.enabled", false^);                     // Sem tour guiado\r\n`;
+        bat += `echo user_pref^("browser.messaging-system.whatsNewPanel.enabled", false^); // Sem painel de novidades\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo // --- Barras e paineis ---\r\n`;
+        bat += `echo user_pref^("browser.toolbars.bookmarks.visibility", "never"^);    // Esconde barra de favoritos\r\n`;
+        bat += `echo user_pref^("browser.download.panel.shown", true^);                // Ja viu painel de download\r\n`;
+        bat += `echo user_pref^("browser.download.useDownloadDir", true^);             // Salva direto sem perguntar\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo // --- Desempenho e estabilidade ---\r\n`;
+        bat += `echo user_pref^("browser.cache.disk.enable", true^);\r\n`;
+        bat += `echo user_pref^("browser.cache.memory.enable", true^);\r\n`;
+        bat += `echo user_pref^("network.http.max-connections", 256^);\r\n`;
+        bat += `) > "%PROF_DIR%\\user.js"\r\n`;
+        bat += `\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo ============================================================\r\n`;
+        bat += `echo   Perfil "RoboRPA" configurado com sucesso!\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo   O robo ja esta preparado para usar este perfil.\r\n`;
+        bat += `echo   Para testar manualmente, execute:\r\n`;
+        bat += `echo   "%FF%" -P "RoboRPA"\r\n`;
+        bat += `echo ============================================================\r\n`;
+        bat += `echo.\r\n`;
+        bat += `pause\r\n`;
+
+        const blob = new Blob([bat], { type: 'application/bat;charset=windows-1252' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'configurar_firefox_roborpa.bat';
         a.click();
         URL.revokeObjectURL(url);
       },
@@ -1843,6 +1979,33 @@
                 <strong>Como usar:</strong> clique com o botão direito no arquivo → <strong>Executar com o PowerShell</strong>
                 (como Administrador). Depois <strong>reinicie o computador</strong> para aplicar. Se o PowerShell bloquear
                 a execução, rode: <code style="background:#f3f4f6; padding:2px 6px; border-radius:4px;">Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="variables-section" style="margin-top:24px;">
+            <div class="variables-title">🦊 Perfil Firefox dedicado</div>
+            <div style="font-size:13px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; padding:10px 12px; border-radius:8px; margin-bottom:20px;">
+              ⚠️ O Firefox pode exibir <strong>abas restauradas</strong>, <strong>página de novidades</strong>,
+              <strong>popup de atualização</strong>, <strong>barra de favoritos</strong> ou perguntar se quer
+              ser o navegador padrão — tudo isso <strong>desvia o robô</strong> do caminho programado.
+            </div>
+
+            <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:16px;">
+              <div style="font-weight:bold; color:#9a3412; margin-bottom:8px;">🛡️ Criar perfil "RoboRPA" sem distrações</div>
+              <div style="font-size:13px; color:#7c2d12; line-height:1.6; margin-bottom:14px;">
+                Cria um perfil separado do Firefox chamado <strong>"RoboRPA"</strong> com todas as
+                distrações desabilitadas: sem restaurar abas, sem página de novidades, sem popups de
+                atualização, sem notificações, sem Pocket, sem barra de favoritos. O robô já usa este
+                perfil automaticamente ao abrir sites.<br><br>
+                <strong>Seu perfil pessoal do Firefox não é alterado</strong> — o perfil RoboRPA é
+                completamente separado.
+              </div>
+              <button class="btn-primary" onclick="app.downloadFirefoxProfile()" style="background:#ea580c;">⬇️ Baixar configurar_firefox_roborpa.bat</button>
+              <div style="font-size:12px; color:#6b7280; margin-top:12px; line-height:1.5;">
+                <strong>Como usar:</strong> dê um <strong>duplo clique</strong> no arquivo. Ele cria o perfil
+                e aplica as configurações automaticamente. Execute <strong>apenas uma vez</strong>.
+                Para testar, abra o Firefox manualmente com: <code style="background:#f3f4f6; padding:2px 6px; border-radius:4px;">firefox.exe -P "RoboRPA"</code>
               </div>
             </div>
           </div>
