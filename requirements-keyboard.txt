@@ -1,0 +1,10 @@
+# Dependência OPCIONAL para melhor performance
+# Use APENAS se tiver permissão para instalar packages
+#
+# Instale com:
+#   pip install -r requirements-keyboard.txt
+#
+# Ou simplesmente:
+#   pip install keyboard
+
+keyboard>=0.13.5

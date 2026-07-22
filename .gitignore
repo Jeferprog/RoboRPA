@@ -1,0 +1,12 @@
+
+# Keyboard Trigger
+temp_type.vbs
+*.pyc
+__pycache__/
+*.egg-info/
+dist/
+build/
+
+# Sistema
+.DS_Store
+Thumbs.db
