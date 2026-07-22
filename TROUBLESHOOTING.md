@@ -1,5 +1,45 @@
 # 🔧 Troubleshooting - Keyboard Trigger
 
+## ❌ "Acesso negado" ao executar Python
+
+Se você vê um erro assim:
+
+```
+Falha na execução do programa 'python.exe': Acesso negado
+NativeCommandFailed
+```
+
+Isso significa que Python está instalado mas **sem permissão** de execução.
+
+### ✅ Solução 1: Executar como Administrador (RECOMENDADO)
+
+1. **Duplo-clique em:** `iniciar_admin.bat`
+2. Clique "Sim" quando Windows pedir permissões
+3. Pronto! ✍️
+
+Este arquivo automaticamente pede permissões de admin.
+
+### ✅ Solução 2: Executar PowerShell como Admin
+
+1. Pressione `Win + X`
+2. Selecione "Windows PowerShell (Administrador)"
+3. Digite:
+   ```powershell
+   cd C:\caminho\ate\keyboard-trigger
+   python keyboard_trigger.py
+   ```
+
+### ✅ Solução 3: Usar versão Standalone (sem Python)
+
+Se tudo falhar, use a versão que não precisa de Python:
+
+1. **Duplo-clique em:** `iniciar_standalone.vbs`
+2. Pronto! ✍️
+
+(Nota: Esta versão não monitora hotkeys, mas mostra o status)
+
+---
+
 ## ❌ "python: comando não encontrado" ou similar
 
 Se você vê um erro assim ao tentar executar `python keyboard_trigger.py`:
@@ -200,14 +240,19 @@ Se nada disso resolver:
 
 ## 📋 Resumo das opções
 
-| Opção | Comando | Fácil? | Requer Terminal? |
-|-------|---------|--------|------------------|
-| **iniciar.bat** | Duplo-clique | ✅✅✅ | ❌ |
-| **iniciar.vbs** | Duplo-clique | ✅✅✅ | ❌ |
-| **iniciar.ps1** | Click direito | ✅✅ | ⚠️ (PowerShell) |
-| **Terminal cmd** | `python ...` | ❌ | ✅ |
+| Opção | Situação | Como usar |
+|-------|----------|-----------|
+| **iniciar_admin.bat** | ✅ Acesso negado | Duplo-clique |
+| **iniciar.bat** | Funciona normal | Duplo-clique |
+| **iniciar_standalone.vbs** | Sem Python | Duplo-clique |
+| **iniciar.vbs** | Funciona normal | Duplo-clique |
+| **iniciar.ps1** | Funciona normal | Click direito |
+| **Terminal cmd** | Avançado | `python ...` |
 
-**Recomendação:** Comece com `iniciar.bat` - é o mais simples e confiável!
+**Recomendação:**
+- Se recebeu **"Acesso negado"** → Use `iniciar_admin.bat`
+- Senão → Use `iniciar.bat`
+- Se nada funcionar → Use `iniciar_standalone.vbs`
 
 ---
 
