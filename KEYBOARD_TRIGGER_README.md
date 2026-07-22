@@ -14,7 +14,34 @@ Perfecto para usuários que precisam digitar textos repetitivos rapidamente.
 
 ## 🚀 Quick Start
 
-### 1. Configurar frases (`phrases.json`)
+### Opção 1: Usar o Gerenciador Web (Recomendado! 🎯)
+
+**Mais fácil e intuitivo:**
+
+1. **Abra o gerenciador:**
+   - Duplo-clique em `keyboard_trigger_manager.html` ou
+   - Arraste o arquivo para o navegador
+
+2. **Gereneie suas frases:**
+   - ➕ Adicione quantas frases quiser
+   - ✏️ Edite existentes
+   - 🗑️ Delete as que não precisa
+   - 📋 Visualize em tempo real
+
+3. **Baixe o arquivo:**
+   - ⬇️ Clique em "Baixar phrases.json"
+   - Salve na mesma pasta do `keyboard_trigger.py`
+
+4. **Execute o script:**
+   ```bash
+   python keyboard_trigger.py
+   ```
+
+---
+
+### Opção 2: Editar `phrases.json` manualmente
+
+Se preferir editar direto:
 
 ```json
 {
@@ -28,22 +55,56 @@ Perfecto para usuários que precisam digitar textos repetitivos rapidamente.
 - `\n` = quebra de linha
 - Hotkeys: `Ctrl+Alt+[1-9]`, `Ctrl+Shift+[A-Z]`, etc.
 
-### 2. Rodar o sistema
+---
+
+### 3. Executar e usar
 
 ```bash
 python keyboard_trigger.py
 ```
-
-Ou em loop infinito (Ctrl+C para parar):
-```bash
-python keyboard_trigger.py
-```
-
-### 3. Usar
 
 - Coloque o cursor onde quer digitar (campo de texto, email, etc.)
 - Pressione o hotkey (ex: `Ctrl+Alt+1`)
 - ✍️ A frase é digitada automaticamente!
+
+---
+
+## 🌐 Gerenciador Web (Novo! ✨)
+
+**`keyboard_trigger_manager.html`** - Interface completa para gerenciar frases!
+
+### Funcionalidades:
+
+- ✅ **Adicionar frases** - Formulário simples e intuitivo
+- ✅ **Editar frases** - Clique em "Editar" para modificar
+- ✅ **Deletar frases** - Remove com confirmação
+- ✅ **Visualizar JSON** - Preview em tempo real com sintaxe highlighting
+- ✅ **Baixar arquivo** - Gera `phrases.json` pronto para usar
+- ✅ **Importar JSON** - Cole um JSON existente para carregar
+- ✅ **Copiar para clipboard** - Compartilhe a configuração facilmente
+- ✅ **Armazenamento local** - Tudo fica salvo no navegador
+
+### Como usar:
+
+1. **Abra no navegador:**
+   ```
+   Duplo-clique em: keyboard_trigger_manager.html
+   ```
+
+2. **Adicione suas frases:**
+   - Preencha o atalho (ex: `Ctrl+Alt+1`)
+   - Digite a frase
+   - Clique em "💾 Salvar Frase"
+
+3. **Visualize no JSON:**
+   - A seção "Preview" mostra o JSON atualizado em tempo real
+
+4. **Baixe ou copie:**
+   - ⬇️ **Baixar**: Gera arquivo `phrases.json`
+   - 📋 **Copiar**: Copia JSON para colar em outro lugar
+
+5. **Pronto!**
+   - Use o JSON baixado com `keyboard_trigger.py`
 
 ---
 
