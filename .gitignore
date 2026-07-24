@@ -1,11 +1,8 @@
-
-# Keyboard Trigger
-temp_type.vbs
-*.pyc
-__pycache__/
-*.egg-info/
-dist/
-build/
+# Keyboard Trigger - arquivos gerados na maquina do usuario
+KeyboardTrigger.exe
+keyboardtrigger_log.txt
+compilar_log.txt
+diagnostico_keyboard.txt
 
 # Sistema
 .DS_Store
