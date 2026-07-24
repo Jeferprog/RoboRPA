@@ -6,8 +6,8 @@ setlocal enabledelayedexpansion
 REM Caminho para a pasta Iniciar
 set "STARTUP_FOLDER=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
 
-REM Caminho do script VBScript
-set "SCRIPT_PATH=%~dp0keyboard_trigger_monitorv2.vbs"
+REM Caminho do script VBScript (versao simples sem erros)
+set "SCRIPT_PATH=%~dp0keyboard_trigger_simples.vbs"
 
 REM Cria o atalho
 if exist "%STARTUP_FOLDER%" (
