@@ -174,13 +174,10 @@ namespace KeyboardTrigger
                 }
             }
 
-            string msg = "Keyboard Trigger esta rodando!\n\nAtalhos ativos: " + registered.Count;
-            if (registered.Count > 0) msg += "\n  " + string.Join("\n  ", registered.ToArray());
-            if (failed.Count > 0) msg += "\n\nCom problema: " + string.Join("\n  ", failed.ToArray());
-            msg += "\n\nTeste: clique num campo de texto e aperte o atalho.\n(Esta janela e so de conferencia; depois eu removo.)";
             Log("Resumo: ativos=" + registered.Count + " problema=" + failed.Count);
-            tray.ShowBalloonTip(3500, "Keyboard Trigger", "Atalhos ativos: " + registered.Count, ToolTipIcon.Info);
-            MessageBox.Show(msg, "Keyboard Trigger");
+            string aviso = "Atalhos ativos: " + registered.Count;
+            if (failed.Count > 0) aviso += "  (com problema: " + failed.Count + ")";
+            tray.ShowBalloonTip(3000, "Keyboard Trigger", aviso, ToolTipIcon.Info);
         }
 
         void UnregisterAll()
