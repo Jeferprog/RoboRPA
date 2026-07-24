@@ -1,138 +1,123 @@
-' Keyboard Trigger - Versao Ultra Simples
-' Sem erros de compilacao!
-
+'============================================================
+' Keyboard Trigger - digita frases prontas (VBScript puro)
+' Nao precisa de admin nem instalar nada.
+' Le as frases de phrases.json (na MESMA pasta deste arquivo).
+'============================================================
 Option Explicit
-Dim objShell, objFSO, strPath, strConfigFile, objPhrases
+
+Dim objShell, objFSO, strPath, strConfig, dicFrases
 Set objShell = CreateObject("WScript.Shell")
 Set objFSO = CreateObject("Scripting.FileSystemObject")
 strPath = objFSO.GetParentFolderName(WScript.ScriptFullName)
-strConfigFile = strPath & "\phrases.json"
+strConfig = strPath & "\phrases.json"
 
-' Carrega frases
+CarregarFrases
+Menu
+
+'------------------------------------------------------------
 Sub CarregarFrases()
-    Dim strConteudo, arrPhrases
-
-    If Not objFSO.FileExists(strConfigFile) Then
-        MsgBox "Arquivo phrases.json nao encontrado!", 16, "Erro"
-        WScript.Quit 1
+    Dim strTexto
+    If Not objFSO.FileExists(strConfig) Then
+        MsgBox "Nao encontrei o arquivo phrases.json nesta pasta:" & vbCrLf & vbCrLf & _
+               strPath & vbCrLf & vbCrLf & _
+               "Gere o phrases.json no keyboard_trigger_manager.html" & vbCrLf & _
+               "e salve na MESMA pasta deste arquivo.", _
+               16, "Keyboard Trigger"
+        WScript.Quit
     End If
-
-    Set objPhrases = CreateObject("Scripting.Dictionary")
-    strConteudo = objFSO.OpenTextFile(strConfigFile, 1).ReadAll()
-    ParsearJSON strConteudo
+    Set dicFrases = CreateObject("Scripting.Dictionary")
+    strTexto = objFSO.OpenTextFile(strConfig, 1).ReadAll()
+    Parsear strTexto
 End Sub
 
-' Parseia JSON
-Sub ParsearJSON(strJSON)
-    Dim i, j, strChave, strValor, blnEmString
-
+'------------------------------------------------------------
+' Parser simples: pega todos os textos entre aspas, em ordem.
+' 1o = chave, 2o = valor, 3o = chave, 4o = valor, e assim por diante.
+Sub Parsear(strJSON)
+    Dim pos, p1, p2, item, idx, chaveTmp
     strJSON = Replace(strJSON, vbCrLf, " ")
     strJSON = Replace(strJSON, vbCr, " ")
     strJSON = Replace(strJSON, vbLf, " ")
-
-    i = 1
-    Do While i < Len(strJSON)
-        If Mid(strJSON, i, 1) = """" Then
-            j = InStr(i + 1, strJSON, """")
-            strChave = Mid(strJSON, i + 1, j - i - 1)
-            i = j + 1
-
-            If Mid(strJSON, i, 1) = ":" Then
-                If Mid(strJSON, i + 1, 1) = """" Then
-                    j = InStr(i + 2, strJSON, """")
-                    strValor = Mid(strJSON, i + 2, j - i - 2)
-                    strValor = Replace(strValor, "\n", vbCrLf)
-                    strValor = Replace(strValor, "\t", vbTab)
-                    strValor = Replace(strValor, "\\", "\")
-                    objPhrases.Add strChave, strValor
-                    i = j
-                End If
-            End If
+    pos = 1
+    idx = 0
+    chaveTmp = ""
+    Do
+        p1 = InStr(pos, strJSON, """")
+        If p1 = 0 Then Exit Do
+        p2 = InStr(p1 + 1, strJSON, """")
+        If p2 = 0 Then Exit Do
+        item = Mid(strJSON, p1 + 1, p2 - p1 - 1)
+        idx = idx + 1
+        If (idx Mod 2) = 1 Then
+            chaveTmp = item
+        Else
+            item = Replace(item, "\n", vbCrLf)
+            item = Replace(item, "\t", vbTab)
+            item = Replace(item, "\\", "\")
+            If Not dicFrases.Exists(chaveTmp) Then dicFrases.Add chaveTmp, item
         End If
-        i = i + 1
+        pos = p2 + 1
     Loop
 End Sub
 
-' Digita texto
-Sub DigitarTexto(strTexto)
-    Dim arrLinhas, i, strLinha, strEscapado
-
-    WScript.Sleep 500
-    arrLinhas = Split(strTexto, vbCrLf)
-
-    For i = LBound(arrLinhas) To UBound(arrLinhas)
-        strLinha = arrLinhas(i)
-        strEscapado = Replace(strLinha, "{", "{{")
-        strEscapado = Replace(strEscapado, "}", "}}")
-        strEscapado = Replace(strEscapado, "+", "{+}")
-
-        If i > LBound(arrLinhas) Then
-            objShell.SendKeys "{ENTER}"
-            WScript.Sleep 100
-        End If
-
-        objShell.SendKeys strEscapado
-        WScript.Sleep 50
-    Next
-End Sub
-
-' Menu principal
-Sub MenuPrincipal()
-    Dim strMsg, strChoice, i, j, strFrase, arrChaves
-
-    CarregarFrases()
-
-    If objPhrases.Count = 0 Then
-        MsgBox "Nenhuma frase configurada!", 48, "Aviso"
-        WScript.Quit 1
+'------------------------------------------------------------
+Sub Menu()
+    Dim strMsg, strEsc, i, chaves
+    If dicFrases.Count = 0 Then
+        MsgBox "Nenhuma frase encontrada em phrases.json.", 48, "Keyboard Trigger"
+        WScript.Quit
     End If
-
-    strMsg = "KEYBOARD TRIGGER" & vbCrLf & vbCrLf & "Selecione uma frase:" & vbCrLf & vbCrLf
-    i = 1
-    For Each strFrase In objPhrases.Keys
-        strMsg = strMsg & i & ". " & strFrase & vbCrLf
-        i = i + 1
-    Next
-
+    chaves = dicFrases.Keys
     Do
-        strChoice = InputBox(strMsg, "Keyboard Trigger")
-
-        If strChoice = "" Then
-            Exit Do
-        End If
-
-        If IsNumeric(strChoice) Then
-            If CLng(strChoice) > 0 And CLng(strChoice) <= objPhrases.Count Then
-                i = 1
-                For Each strFrase In objPhrases.Keys
-                    If i = CLng(strChoice) Then
-                        MsgBox "Digitando: " & strFrase & vbCrLf & vbCrLf & "Clique OK e coloque o cursor no campo.", 64
-                        DigitarTexto objPhrases(strFrase)
-                        MsgBox "Pronto!", 64
-                        Exit For
-                    End If
-                    i = i + 1
-                Next
+        strMsg = "KEYBOARD TRIGGER" & vbCrLf & vbCrLf & _
+                 "Digite o numero da frase e clique OK:" & vbCrLf & vbCrLf
+        For i = 0 To dicFrases.Count - 1
+            strMsg = strMsg & (i + 1) & ") " & chaves(i) & vbCrLf
+        Next
+        strMsg = strMsg & vbCrLf & "(Deixe em branco e clique OK para sair)"
+        strEsc = InputBox(strMsg, "Keyboard Trigger")
+        If strEsc = "" Then Exit Do
+        If IsNumeric(strEsc) Then
+            i = CLng(strEsc)
+            If i >= 1 And i <= dicFrases.Count Then
+                Digitar dicFrases(chaves(i - 1))
             Else
-                MsgBox "Numero invalido!", 16
+                MsgBox "Numero fora do intervalo.", 48, "Keyboard Trigger"
             End If
         Else
-            MsgBox "Digite um numero valido!", 16
+            MsgBox "Digite apenas o numero da frase.", 48, "Keyboard Trigger"
         End If
     Loop
 End Sub
 
-' Verifica se e numero
-Function IsNumeric(str)
-    Dim i
-    IsNumeric = True
-    If str = "" Then IsNumeric = False
-    For i = 1 To Len(str)
-        If Asc(Mid(str, i, 1)) < 48 Or Asc(Mid(str, i, 1)) > 57 Then
-            IsNumeric = False
+'------------------------------------------------------------
+Sub Digitar(strTexto)
+    Dim arr, i
+    MsgBox "Clique OK e depois clique no campo onde quer escrever." & vbCrLf & vbCrLf & _
+           "Voce tem 3 segundos ate a digitacao comecar.", 64, "Keyboard Trigger"
+    WScript.Sleep 3000
+    arr = Split(strTexto, vbCrLf)
+    For i = 0 To UBound(arr)
+        If i > 0 Then
+            objShell.SendKeys "{ENTER}"
+            WScript.Sleep 120
         End If
+        objShell.SendKeys Escapar(arr(i))
+        WScript.Sleep 60
     Next
-End Function
+End Sub
 
-' Executa
-MenuPrincipal()
+'------------------------------------------------------------
+' Escapa caracteres especiais do SendKeys.
+Function Escapar(s)
+    s = Replace(s, "{", Chr(1))
+    s = Replace(s, "}", "{}}")
+    s = Replace(s, Chr(1), "{{}")
+    s = Replace(s, "+", "{+}")
+    s = Replace(s, "^", "{^}")
+    s = Replace(s, "%", "{%}")
+    s = Replace(s, "~", "{~}")
+    s = Replace(s, "(", "{(}")
+    s = Replace(s, ")", "{)}")
+    Escapar = s
+End Function
