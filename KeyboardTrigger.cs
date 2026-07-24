@@ -68,6 +68,14 @@ namespace KeyboardTrigger
         int nextId = 1;
         NotifyIcon tray;
 
+        // ---------- log (para diagnostico) ----------
+        static string LogPath { get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "keyboardtrigger_log.txt"); } }
+        static void Log(string s)
+        {
+            try { File.AppendAllText(LogPath, DateTime.Now.ToString("HH:mm:ss") + "  " + s + Environment.NewLine); }
+            catch { }
+        }
+
         public MainForm()
         {
             configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "phrases.json");
@@ -82,9 +90,19 @@ namespace KeyboardTrigger
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
-            this.Hide();
-            SetupTray();
-            LoadAndRegister();
+            try
+            {
+                Log("OnLoad: iniciando. Handle criado=" + this.IsHandleCreated);
+                this.Hide();
+                SetupTray();
+                LoadAndRegister();
+                Log("OnLoad: concluido.");
+            }
+            catch (Exception ex)
+            {
+                Log("ERRO OnLoad: " + ex);
+                MessageBox.Show("Erro ao iniciar: " + ex.Message, "Keyboard Trigger");
+            }
         }
 
         void SetupTray()
@@ -109,11 +127,15 @@ namespace KeyboardTrigger
             registered.Clear();
             failed.Clear();
 
+            Log("LoadAndRegister: config=" + configPath + " existe=" + File.Exists(configPath));
             if (!File.Exists(configPath))
             {
                 tray.ShowBalloonTip(6000, "Keyboard Trigger",
                     "Nao encontrei phrases.json na pasta do programa. Gere no HTML, salve aqui e clique em Recarregar.",
                     ToolTipIcon.Warning);
+                MessageBox.Show("Nao encontrei o arquivo phrases.json na pasta:\n\n" + configPath +
+                    "\n\nGere no keyboard_trigger_manager.html, salve nesta pasta e clique em Recarregar.",
+                    "Keyboard Trigger");
                 return;
             }
 
@@ -121,11 +143,13 @@ namespace KeyboardTrigger
             try { content = File.ReadAllText(configPath, Encoding.UTF8); }
             catch (Exception ex)
             {
-                tray.ShowBalloonTip(6000, "Keyboard Trigger", "Erro ao ler phrases.json: " + ex.Message, ToolTipIcon.Error);
+                Log("Erro ao ler phrases.json: " + ex);
+                MessageBox.Show("Erro ao ler phrases.json: " + ex.Message, "Keyboard Trigger");
                 return;
             }
 
             List<string[]> pairs = ParseJson(content);
+            Log("Frases lidas do JSON: " + pairs.Count);
             foreach (string[] kv in pairs)
             {
                 string hotkey = kv[0];
@@ -137,7 +161,9 @@ namespace KeyboardTrigger
                     continue;
                 }
                 int id = nextId++;
-                if (RegisterHotKey(this.Handle, id, mods | MOD_NOREPEAT, vk))
+                bool ok = RegisterHotKey(this.Handle, id, mods | MOD_NOREPEAT, vk);
+                Log("Registrar '" + hotkey + "' (mods=" + mods + " vk=" + vk + ") => " + (ok ? "OK" : "FALHOU"));
+                if (ok)
                 {
                     idToText[id] = text;
                     registered.Add(hotkey);
@@ -148,9 +174,13 @@ namespace KeyboardTrigger
                 }
             }
 
-            string msg = "Rodando. Atalhos ativos: " + registered.Count;
-            if (failed.Count > 0) msg += "  |  Com problema: " + failed.Count;
-            tray.ShowBalloonTip(3500, "Keyboard Trigger", msg, ToolTipIcon.Info);
+            string msg = "Keyboard Trigger esta rodando!\n\nAtalhos ativos: " + registered.Count;
+            if (registered.Count > 0) msg += "\n  " + string.Join("\n  ", registered.ToArray());
+            if (failed.Count > 0) msg += "\n\nCom problema: " + string.Join("\n  ", failed.ToArray());
+            msg += "\n\nTeste: clique num campo de texto e aperte o atalho.\n(Esta janela e so de conferencia; depois eu removo.)";
+            Log("Resumo: ativos=" + registered.Count + " problema=" + failed.Count);
+            tray.ShowBalloonTip(3500, "Keyboard Trigger", "Atalhos ativos: " + registered.Count, ToolTipIcon.Info);
+            MessageBox.Show(msg, "Keyboard Trigger");
         }
 
         void UnregisterAll()
@@ -327,13 +357,25 @@ namespace KeyboardTrigger
         [STAThread]
         static void Main()
         {
-            bool criouNovo;
-            mutex = new Mutex(true, "KeyboardTrigger_SingleInstance_9F3A2C", out criouNovo);
-            if (!criouNovo) return; // ja existe uma instancia rodando
+            try
+            {
+                Log("=== Main iniciando ===");
+                bool criouNovo;
+                mutex = new Mutex(true, "KeyboardTrigger_SingleInstance_9F3A2C", out criouNovo);
+                Log("Instancia nova=" + criouNovo);
+                if (!criouNovo) { Log("Ja havia instancia rodando; saindo."); return; }
 
-            Application.EnableVisualStyles();
-            Application.Run(new MainForm());
-            GC.KeepAlive(mutex);
+                Application.EnableVisualStyles();
+                Application.Run(new MainForm());
+                GC.KeepAlive(mutex);
+                Log("=== Main encerrando ===");
+            }
+            catch (Exception ex)
+            {
+                Log("FATAL Main: " + ex);
+                try { MessageBox.Show("Erro fatal: " + ex.Message, "Keyboard Trigger"); }
+                catch { }
+            }
         }
     }
 }
