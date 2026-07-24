@@ -1,13 +1,11 @@
 ' ============================================================
 ' Keyboard Trigger Monitor v2 - VBScript Puro
 ' Funciona SEM permissoes de administrador!
-' Monitora hotkeys e simula digitacao
 ' ============================================================
 
 Option Explicit
 
-Dim shell, fso, scriptPath, configFile
-Dim phrases, keyStates, runningLoop
+Dim shell, fso, scriptPath, configFile, phrases
 
 Set shell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
@@ -23,7 +21,6 @@ Sub LoadConfig()
 
     If Not fso.FileExists(configFile) Then
         MsgBox "❌ Arquivo phrases.json nao encontrado!" & vbCrLf & vbCrLf & _
-               "Caminho esperado:" & vbCrLf & configFile & vbCrLf & vbCrLf & _
                "Solucao:" & vbCrLf & _
                "1. Abra keyboard_trigger_manager.html" & vbCrLf & _
                "2. Adicione suas frases" & vbCrLf & _
@@ -41,54 +38,67 @@ Sub LoadConfig()
     ParseJson fileContent
 End Sub
 
-' Simples parser JSON
+' Parser JSON simples
 Sub ParseJson(jsonText)
-    Dim startPos, endPos, hotkey, phrase
+    Dim i, char, inString, key, value
+    Dim currentKey, currentValue
 
+    inString = False
+    currentKey = ""
+    currentValue = ""
+
+    ' Remove quebras de linha
     jsonText = Replace(jsonText, vbCrLf, " ")
     jsonText = Replace(jsonText, vbCr, " ")
     jsonText = Replace(jsonText, vbLf, " ")
 
-    startPos = InStr(1, jsonText, """") + 1
+    ' Parse manual simples
+    For i = 1 To Len(jsonText)
+        char = Mid(jsonText, i, 1)
 
-    While startPos > 1
-        endPos = InStr(startPos, jsonText, """")
-        If endPos = 0 Then Exit While
-
-        hotkey = Mid(jsonText, startPos, endPos - startPos)
-        startPos = InStr(endPos + 1, jsonText, """") + 1
-        If startPos = 0 Then Exit While
-
-        endPos = InStr(startPos, jsonText, """")
-        If endPos = 0 Then Exit While
-
-        phrase = Mid(jsonText, startPos, endPos - startPos)
-
-        phrase = Replace(phrase, "\n", vbCrLf)
-        phrase = Replace(phrase, "\t", vbTab)
-        phrase = Replace(phrase, "\\", "\")
-
-        If Len(hotkey) > 0 Then
-            phrases(hotkey) = phrase
+        If char = """" Then
+            inString = Not inString
+        ElseIf inString Then
+            If currentKey = "" Then
+                currentKey = currentKey & char
+            Else
+                currentValue = currentValue & char
+            End If
+        ElseIf char = ":" And currentKey <> "" And currentValue = "" Then
+            ' Encontrou separador key:value
+        ElseIf char = "," And currentKey <> "" And currentValue <> "" Then
+            ' Encontrou separador de pares
+            currentValue = Replace(currentValue, "\n", vbCrLf)
+            currentValue = Replace(currentValue, "\t", vbTab)
+            currentValue = Replace(currentValue, "\\", "\")
+            phrases.Add currentKey, currentValue
+            currentKey = ""
+            currentValue = ""
         End If
+    Next
 
-        startPos = InStr(endPos + 1, jsonText, """") + 1
-    Wend
+    ' Processa ultimo par
+    If currentKey <> "" And currentValue <> "" Then
+        currentValue = Replace(currentValue, "\n", vbCrLf)
+        currentValue = Replace(currentValue, "\t", vbTab)
+        currentValue = Replace(currentValue, "\\", "\")
+        phrases.Add currentKey, currentValue
+    End If
 End Sub
 
 ' ============================================================
 ' SIMULA DIGITACAO
 ' ============================================================
 Sub TypePhrase(text)
-    Dim lines, i, escapedLine
+    Dim lines, i, line, escapedLine
 
     WScript.Sleep 300
 
     lines = Split(text, vbCrLf)
 
     For i = LBound(lines) To UBound(lines)
-        escapedLine = lines(i)
-        escapedLine = Replace(escapedLine, "{", "{{")
+        line = lines(i)
+        escapedLine = Replace(line, "{", "{{")
         escapedLine = Replace(escapedLine, "}", "}}")
         escapedLine = Replace(escapedLine, "+", "{+}")
 
@@ -103,103 +113,126 @@ Sub TypePhrase(text)
 End Sub
 
 ' ============================================================
-' MONITORAMENTO DE HOTKEYS (COM POPUP)
+' EXIBE MENU E SELECIONA FRASE
 ' ============================================================
-Sub ShowHotkeysMenu()
-    Dim msg, hotkey, choice, phraseList, i
+Function SelectPhrase()
+    Dim msg, hotkey, choice, phraseList, i, count
 
-    ' Cria lista de hotkeys
     Set phraseList = CreateObject("Scripting.Dictionary")
 
-    i = 1
+    count = 0
     For Each hotkey In phrases.Keys
-        phraseList.Add CStr(i), hotkey
-        i = i + 1
+        count = count + 1
+        phraseList.Add CStr(count), hotkey
     Next
 
-    ' Constroi mensagem do menu
     msg = "╔════════════════════════════════════════╗" & vbCrLf & _
           "║  🎹 KEYBOARD TRIGGER SYSTEM            ║" & vbCrLf & _
-          "║  Selecione uma frase para digitar      ║" & vbCrLf & _
+          "║  Selecione uma frase                   ║" & vbCrLf & _
           "╚════════════════════════════════════════╝" & vbCrLf & vbCrLf
 
-    For i = 1 To phraseList.Count
-        msg = msg & i & ". " & phraseList(CStr(i)) & vbCrLf & _
-              "   > " & Left(phrases(phraseList(CStr(i))), 50) & "..." & vbCrLf & vbCrLf
+    For i = 1 To count
+        hotkey = phraseList(CStr(i))
+        msg = msg & i & ". " & hotkey & vbCrLf & _
+              "   """ & Left(phrases(hotkey), 40) & """" & vbCrLf & vbCrLf
     Next
 
-    msg = msg & vbCrLf & "Digite o numero (1-" & phraseList.Count & ") e clique OK" & vbCrLf & _
-              "ou clique Cancelar para fechar."
+    msg = msg & vbCrLf & "Digite o numero (1-" & count & "):"
 
-    choice = InputBox(msg, "Keyboard Trigger - Selecione Frase")
+    choice = InputBox(msg, "Keyboard Trigger")
 
     If choice = "" Then
-        Exit Sub
-    End If
-
-    If IsNumeric(choice) Then
-        If CLng(choice) >= 1 And CLng(choice) <= phraseList.Count Then
-            hotkey = phraseList(CStr(CLng(choice)))
-            MsgBox "Digitando: " & Left(phrases(hotkey), 50) & "..." & vbCrLf & vbCrLf & _
-                   "Clique OK e coloque o cursor no campo onde quer digitar.", vbInformation
-            TypePhrase phrases(hotkey)
-            MsgBox "✅ Frase digitada!", vbInformation
-            Exit Sub
+        SelectPhrase = ""
+    ElseIf IsNumeric(choice) Then
+        If CLng(choice) >= 1 And CLng(choice) <= count Then
+            SelectPhrase = phraseList(CStr(CLng(choice)))
+        Else
+            MsgBox "❌ Numero invalido!", vbCritical
+            SelectPhrase = ""
         End If
+    Else
+        MsgBox "❌ Digite um numero valido!", vbCritical
+        SelectPhrase = ""
     End If
+End Function
 
-    MsgBox "❌ Escolha invalida!", vbCritical
-End Sub
+' Verifica se e numero
+Function IsNumeric(str)
+    Dim i
+    IsNumeric = True
+    If str = "" Then
+        IsNumeric = False
+    Else
+        For i = 1 To Len(str)
+            If Not IsNumeric(Asc(Mid(str, i, 1))) Then
+                IsNumeric = False
+            End If
+        Next
+    End If
+End Function
+
+' Sobrecarga IsNumeric para caractere
+Function IsNumeric(charCode)
+    IsNumeric = (charCode >= 48 And charCode <= 57)
+End Function
 
 ' ============================================================
 ' MENU PRINCIPAL
 ' ============================================================
-Sub ShowMainMenu()
-    Dim msg, result
+Sub MainMenu()
+    Dim msg, hotkey
+
+    LoadConfig()
+
+    If phrases.Count = 0 Then
+        MsgBox "❌ Nenhuma frase configurada!" & vbCrLf & vbCrLf & _
+               "Use o gerenciador HTML:" & vbCrLf & _
+               "keyboard_trigger_manager.html", vbExclamation
+        WScript.Quit 1
+    End If
 
     msg = "╔════════════════════════════════════════╗" & vbCrLf & _
-          "║  🎹 KEYBOARD TRIGGER SYSTEM            ║" & vbCrLf & _
-          "║  Monitor de Frases                     ║" & vbCrLf & _
+          "║  🎹 KEYBOARD TRIGGER                  ║" & vbCrLf & _
+          "║  Versao VBScript (Sem Admin)          ║" & vbCrLf & _
           "╚════════════════════════════════════════╝" & vbCrLf & vbCrLf & _
           "📋 Frases carregadas: " & phrases.Count & vbCrLf & vbCrLf & _
           "🎯 Como usar:" & vbCrLf & _
-          "1. Clique 'OK' no proximo popup" & vbCrLf & _
-          "2. Selecione a frase que quer digitar" & vbCrLf & _
+          "1. Clique OK no proximo popup" & vbCrLf & _
+          "2. Digite o numero da frase" & vbCrLf & _
           "3. Coloque o cursor no campo de texto" & vbCrLf & _
-          "4. Clique 'OK' para digitar" & vbCrLf & vbCrLf & _
-          "💡 Dica: Deixe este programa aberto e" & vbCrLf & _
-          "   chame-o sempre que precisar!" & vbCrLf & vbCrLf & _
-          "❌ Para sair, feche esta janela."
+          "4. Clique OK para digitar a frase" & vbCrLf & vbCrLf & _
+          "💡 Deixe este programa aberto e" & vbCrLf & _
+          "   use sempre que precisar!"
 
     MsgBox msg, vbInformation, "Keyboard Trigger"
-    ShowHotkeysMenu()
+
+    RunLoop()
 End Sub
 
-' Verifica se e numero
-Function IsNumeric(strValue)
-    Dim i
-    IsNumeric = True
-    For i = 1 To Len(strValue)
-        If Not IsNumeric(Mid(strValue, i, 1)) Then
-            IsNumeric = False
-            Exit Function
+' Loop de selecao
+Sub RunLoop()
+    Dim selectedHotkey, continueLoop
+
+    continueLoop = True
+
+    Do While continueLoop
+        selectedHotkey = SelectPhrase()
+
+        If selectedHotkey = "" Then
+            continueLoop = False
+        Else
+            MsgBox "Digitando: " & Left(phrases(selectedHotkey), 50) & vbCrLf & vbCrLf & _
+                   "Clique OK e coloque o cursor no campo onde quer digitar.", vbInformation
+
+            TypePhrase phrases(selectedHotkey)
+
+            MsgBox "✅ Frase digitada!" & vbCrLf & vbCrLf & _
+                   "Selecione outra ou clique Cancelar para sair.", vbInformation
         End If
-    Next
-End Function
+    Loop
+End Sub
 
 ' ============================================================
-' PONTO DE ENTRADA
+' EXECUTA
 ' ============================================================
-LoadConfig()
-
-If phrases.Count = 0 Then
-    MsgBox "❌ Nenhuma frase configurada!" & vbCrLf & vbCrLf & _
-           "Use o gerenciador HTML:" & vbCrLf & _
-           "keyboard_trigger_manager.html", vbExclamation
-    WScript.Quit 1
-End If
-
-' Loop principal
-Do While True
-    ShowMainMenu()
-Loop
+MainMenu()
