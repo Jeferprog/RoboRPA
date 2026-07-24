@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎹 Gerenciador de Keyboard Trigger</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 1024px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            color: #333;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        input[type="text"],
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .btn-danger {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #ff5252;
+        }
+
+        .btn-success {
+            background: #51cf66;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #40c057;
+        }
+
+        .btn-info {
+            background: #4dabf7;
+            color: white;
+        }
+
+        .btn-info:hover {
+            background: #339af0;
+        }
+
+        .phrases-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 500px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .phrase-item {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+        }
+
+        .phrase-item:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transform: translateX(5px);
+        }
+
+        .phrase-info {
+            flex: 1;
+        }
+
+        .hotkey {
+            font-weight: 600;
+            color: #667eea;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+        }
+
+        .phrase-text {
+            color: #666;
+            font-size: 0.95em;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 60px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .phrase-actions {
+            display: flex;
+            gap: 8px;
+            margin-left: 15px;
+        }
+
+        .btn-small {
+            padding: 8px 12px;
+            font-size: 0.9em;
+            white-space: nowrap;
+        }
+
+        .json-preview {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            max-height: 300px;
+            overflow-y: auto;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .json-preview .key {
+            color: #9cdcfe;
+        }
+
+        .json-preview .value {
+            color: #ce9178;
+        }
+
+        .json-preview .bracket {
+            color: #d4d4d4;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: slideDown 0.3s;
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 15px;
+        }
+
+        .close-modal {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .close-modal:hover {
+            color: #000;
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 30px;
+            font-size: 0.9em;
+        }
+
+        .hotkey-hint {
+            font-size: 0.85em;
+            color: #999;
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #5568d3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎹 Gerenciador de Keyboard Trigger</h1>
+            <p>Gerencie suas frases e atalhos de teclado</p>
+        </header>
+
+        <div id="alertContainer"></div>
+
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-number" id="totalPhrases">0</div>
+                <div class="stat-label">Frases cadastradas</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="totalSize">0</div>
+                <div class="stat-label">Tamanho (bytes)</div>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- Painel de Adicionar/Editar -->
+            <div class="card">
+                <h2>➕ Adicionar/Editar Frase</h2>
+                <div class="form-group">
+                    <label for="hotkey">Atalho (Hotkey)</label>
+                    <input type="text" id="hotkey" placeholder="Ex: Ctrl+Alt+1" value="">
+                    <div class="hotkey-hint">Use formato: Ctrl+Alt+1, Ctrl+Shift+A, etc.</div>
+                </div>
+                <div class="form-group">
+                    <label for="phrase">Texto da frase</label>
+                    <textarea id="phrase" placeholder="Digite sua frase aqui...&#10;Suporta múltiplas linhas"></textarea>
+                    <div class="hotkey-hint">Use \n para quebra de linha (ou Enter)</div>
+                </div>
+                <div class="button-group">
+                    <button class="btn-primary" onclick="addOrUpdatePhrase()">💾 Salvar Frase</button>
+                    <button class="btn-secondary" onclick="clearForm()">🔄 Limpar</button>
+                </div>
+            </div>
+
+            <!-- Lista de Frases -->
+            <div class="card">
+                <h2>📋 Suas Frases</h2>
+                <div id="phrasesList" class="phrases-list">
+                    <p style="color: #999; text-align: center; padding: 20px;">
+                        Nenhuma frase cadastrada ainda
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Preview JSON -->
+        <div class="card">
+            <h2>📄 Preview - phrases.json</h2>
+            <div class="json-preview" id="jsonPreview">{}</div>
+            <div class="button-group" style="margin-top: 15px;">
+                <button class="btn-success" onclick="downloadJSON()">⬇️ Baixar phrases.json</button>
+                <button class="btn-info" onclick="copyToClipboard()">📋 Copiar JSON</button>
+                <button class="btn-secondary" onclick="importJSON()">📤 Importar JSON</button>
+                <button class="btn-danger" onclick="clearAllPhrases()">🗑️ Limpar Tudo</button>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <p>🎹 Keyboard Trigger Manager v1.0 | Cresol RPA</p>
+            <p>Gerencie suas frases e baixe a configuração para usar com keyboard_trigger.py</p>
+        </footer>
+    </div>
+
+    <!-- Modal para importar JSON -->
+    <div id="importModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeImportModal()">&times;</span>
+            <div class="modal-header">📤 Importar JSON</div>
+            <div class="form-group">
+                <label for="jsonInput">Cole o conteúdo do JSON:</label>
+                <textarea id="jsonInput" style="height: 200px; font-size: 0.9em;"></textarea>
+            </div>
+            <div class="button-group">
+                <button class="btn-primary" onclick="confirmImportJSON()">✅ Importar</button>
+                <button class="btn-secondary" onclick="closeImportModal()">❌ Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Estado global
+        let phrases = {};
+        let editingHotkey = null;
+
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', function() {
+            loadFromLocalStorage();
+            renderPhrases();
+            updateStats();
+        });
+
+        // ============================================
+        // GERENCIAMENTO DE DADOS
+        // ============================================
+
+        function loadFromLocalStorage() {
+            try {
+                const saved = localStorage.getItem('keyboardTriggerPhrases');
+                if (saved) {
+                    phrases = JSON.parse(saved);
+                }
+            } catch (e) {
+                showAlert('⚠️ Erro ao carregar dados salvos', 'error');
+            }
+        }
+
+        function saveToLocalStorage() {
+            try {
+                localStorage.setItem('keyboardTriggerPhrases', JSON.stringify(phrases));
+                updateStats();
+            } catch (e) {
+                showAlert('❌ Erro ao salvar dados', 'error');
+            }
+        }
+
+        function addOrUpdatePhrase() {
+            const hotkey = document.getElementById('hotkey').value.trim();
+            const phrase = document.getElementById('phrase').value.trim();
+
+            if (!hotkey) {
+                showAlert('⚠️ Digite um atalho (hotkey)', 'error');
+                return;
+            }
+
+            if (!phrase) {
+                showAlert('⚠️ Digite uma frase', 'error');
+                return;
+            }
+
+            // Valida formato do hotkey
+            if (!isValidHotkey(hotkey)) {
+                showAlert('❌ Formato de hotkey inválido. Use: Ctrl+Alt+1, Ctrl+Shift+A, etc.', 'error');
+                return;
+            }
+
+            // Se estava editando, remove a antiga
+            if (editingHotkey && editingHotkey !== hotkey) {
+                delete phrases[editingHotkey];
+            }
+
+            phrases[hotkey] = phrase;
+            saveToLocalStorage();
+            renderPhrases();
+
+            const msg = editingHotkey ? '✏️ Frase atualizada!' : '✅ Frase adicionada!';
+            showAlert(msg, 'success');
+
+            clearForm();
+        }
+
+        function deletePhrase(hotkey) {
+            if (confirm(`Tem certeza que quer deletar "${hotkey}"?`)) {
+                delete phrases[hotkey];
+                saveToLocalStorage();
+                renderPhrases();
+                showAlert('🗑️ Frase deletada!', 'success');
+                clearForm();
+            }
+        }
+
+        function editPhrase(hotkey) {
+            const phrase = phrases[hotkey];
+            document.getElementById('hotkey').value = hotkey;
+            document.getElementById('phrase').value = phrase;
+            editingHotkey = hotkey;
+            document.querySelector('.card h2').textContent = '✏️ Editar Frase';
+            document.getElementById('hotkey').focus();
+        }
+
+        function clearForm() {
+            document.getElementById('hotkey').value = '';
+            document.getElementById('phrase').value = '';
+            editingHotkey = null;
+            document.querySelector('.card h2').textContent = '➕ Adicionar/Editar Frase';
+        }
+
+        function clearAllPhrases() {
+            if (confirm('Tem CERTEZA? Isso vai deletar todas as frases!')) {
+                phrases = {};
+                saveToLocalStorage();
+                renderPhrases();
+                clearForm();
+                showAlert('🗑️ Todas as frases foram deletadas!', 'success');
+            }
+        }
+
+        // ============================================
+        // RENDERIZAÇÃO
+        // ============================================
+
+        function renderPhrases() {
+            const container = document.getElementById('phrasesList');
+
+            if (Object.keys(phrases).length === 0) {
+                container.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Nenhuma frase cadastrada ainda</p>';
+                renderJSON();
+                return;
+            }
+
+            container.innerHTML = Object.entries(phrases)
+                .map(([hotkey, phrase]) => `
+                    <div class="phrase-item">
+                        <div class="phrase-info">
+                            <div class="hotkey">🔑 ${escapeHtml(hotkey)}</div>
+                            <div class="phrase-text">${escapeHtml(phrase)}</div>
+                        </div>
+                        <div class="phrase-actions">
+                            <button class="btn-secondary btn-small" onclick="editPhrase('${escapeJs(hotkey)}')">✏️ Editar</button>
+                            <button class="btn-danger btn-small" onclick="deletePhrase('${escapeJs(hotkey)}')">🗑️ Deletar</button>
+                        </div>
+                    </div>
+                `)
+                .join('');
+
+            renderJSON();
+        }
+
+        function renderJSON() {
+            const container = document.getElementById('jsonPreview');
+            const jsonString = JSON.stringify(phrases, null, 2);
+
+            if (Object.keys(phrases).length === 0) {
+                container.textContent = '{}';
+                return;
+            }
+
+            // Sintaxe highlighting simples
+            let html = jsonString
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/(".*?")\s*:/g, '<span class="key">$1</span>:')
+                .replace(/:\s*"(.*?)"/g, ': <span class="value">"$1"</span>')
+                .replace(/[{}[\]]/g, match => `<span class="bracket">${match}</span>`);
+
+            container.innerHTML = html;
+        }
+
+        function updateStats() {
+            const count = Object.keys(phrases).length;
+            const size = JSON.stringify(phrases).length;
+
+            document.getElementById('totalPhrases').textContent = count;
+            document.getElementById('totalSize').textContent = size;
+        }
+
+        // ============================================
+        // DOWNLOAD / IMPORT
+        // ============================================
+
+        function downloadJSON() {
+            if (Object.keys(phrases).length === 0) {
+                showAlert('⚠️ Adicione pelo menos uma frase antes de baixar', 'error');
+                return;
+            }
+
+            const dataStr = JSON.stringify(phrases, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'phrases.json';
+            link.click();
+            URL.revokeObjectURL(url);
+
+            showAlert('✅ phrases.json baixado com sucesso!', 'success');
+        }
+
+        function copyToClipboard() {
+            const json = JSON.stringify(phrases, null, 2);
+            navigator.clipboard.writeText(json).then(() => {
+                showAlert('📋 JSON copiado para a área de transferência!', 'success');
+            }).catch(() => {
+                showAlert('❌ Erro ao copiar', 'error');
+            });
+        }
+
+        function importJSON() {
+            document.getElementById('jsonInput').value = '';
+            document.getElementById('importModal').style.display = 'block';
+        }
+
+        function closeImportModal() {
+            document.getElementById('importModal').style.display = 'none';
+        }
+
+        function confirmImportJSON() {
+            const input = document.getElementById('jsonInput').value.trim();
+
+            if (!input) {
+                showAlert('⚠️ Cole o JSON primeiro', 'error');
+                return;
+            }
+
+            try {
+                const imported = JSON.parse(input);
+
+                // Valida que é um objeto válido
+                if (typeof imported !== 'object' || Array.isArray(imported)) {
+                    throw new Error('JSON deve ser um objeto');
+                }
+
+                // Valida todos os hotkeys
+                for (const key in imported) {
+                    if (!isValidHotkey(key)) {
+                        throw new Error(`Hotkey inválido: ${key}`);
+                    }
+                }
+
+                phrases = imported;
+                saveToLocalStorage();
+                renderPhrases();
+                closeImportModal();
+                showAlert('✅ JSON importado com sucesso!', 'success');
+            } catch (e) {
+                showAlert(`❌ Erro ao importar: ${e.message}`, 'error');
+            }
+        }
+
+        // ============================================
+        // UTILIDADES
+        // ============================================
+
+        function isValidHotkey(hotkey) {
+            // Valida formato: Ctrl+Alt+1, Ctrl+Shift+A, etc.
+            const pattern = /^(Ctrl|Shift|Alt)\+((Ctrl|Shift|Alt)\+)?[A-Z0-9]$/;
+            return pattern.test(hotkey);
+        }
+
+        function showAlert(message, type = 'info') {
+            const container = document.getElementById('alertContainer');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.innerHTML = message;
+
+            container.appendChild(alert);
+
+            setTimeout(() => {
+                alert.style.opacity = '0';
+                alert.style.transform = 'translateY(-10px)';
+                setTimeout(() => alert.remove(), 300);
+            }, 3000);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function escapeJs(text) {
+            return text.replace(/'/g, "\\'").replace(/"/g, '\\"');
+        }
+
+        // Fechar modal ao clicar fora
+        window.onclick = function(event) {
+            const modal = document.getElementById('importModal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
