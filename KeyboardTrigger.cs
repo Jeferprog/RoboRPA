@@ -55,10 +55,19 @@ namespace KeyboardTrigger
         [DllImport("user32.dll", SetLastError = true)]
         static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
 
+        [DllImport("user32.dll")]
+        static extern short GetAsyncKeyState(int vKey);
+
         const int INPUT_KEYBOARD = 1;
         const uint KEYEVENTF_KEYUP = 0x0002;
         const uint KEYEVENTF_UNICODE = 0x0004;
         const ushort VK_RETURN = 0x0D;
+
+        const int VK_SHIFT = 0x10, VK_CONTROL = 0x11, VK_MENU = 0x12, VK_LWIN = 0x5B, VK_RWIN = 0x5C;
+
+        // Pausa entre cada tecla digitada (ms). Maior = mais lento, porem
+        // mais confiavel em campos web (Chrome/Edge). 12 costuma ir bem.
+        const int CHAR_DELAY_MS = 12;
 
         // ---------- estado ----------
         readonly string configPath;
@@ -231,14 +240,45 @@ namespace KeyboardTrigger
         // ---------- digitar o texto ----------
         void TypeText(string text)
         {
-            Thread.Sleep(90); // tempo para soltar Ctrl/Alt do atalho
+            // 1) solta os modificadores do atalho (Ctrl/Shift/Alt/Win) para
+            //    que nao interfiram nas teclas que vamos injetar.
+            ReleaseModifiers();
+
+            // 2) espera o usuario tirar o dedo das teclas fisicas (ate ~500ms).
+            //    Sem isso, o navegador perde os primeiros caracteres.
+            for (int i = 0; i < 50; i++)
+            {
+                bool held = GetAsyncKeyState(VK_CONTROL) < 0
+                         || GetAsyncKeyState(VK_SHIFT) < 0
+                         || GetAsyncKeyState(VK_MENU) < 0
+                         || GetAsyncKeyState(VK_LWIN) < 0
+                         || GetAsyncKeyState(VK_RWIN) < 0;
+                if (!held) break;
+                Thread.Sleep(10);
+            }
+            Thread.Sleep(70); // folga extra para o campo ficar pronto
+
+            // 3) digita caractere a caractere, com pausa (campos web precisam).
             text = text.Replace("\r\n", "\n").Replace("\r", "\n");
             foreach (char c in text)
             {
                 if (c == '\n') SendVirtualKey(VK_RETURN);
                 else SendUnicode(c);
-                Thread.Sleep(3);
+                Thread.Sleep(CHAR_DELAY_MS);
             }
+        }
+
+        // Solta Ctrl/Shift/Alt/Win (envia key-up) para limpar o estado fisico.
+        void ReleaseModifiers()
+        {
+            int[] mods = { VK_CONTROL, VK_SHIFT, VK_MENU, VK_LWIN, VK_RWIN };
+            INPUT[] inp = new INPUT[mods.Length];
+            for (int i = 0; i < mods.Length; i++)
+            {
+                inp[i].type = INPUT_KEYBOARD;
+                inp[i].u.ki = new KEYBDINPUT { wVk = (ushort)mods[i], wScan = 0, dwFlags = KEYEVENTF_KEYUP, time = 0, dwExtraInfo = IntPtr.Zero };
+            }
+            SendInput((uint)inp.Length, inp, Marshal.SizeOf(typeof(INPUT)));
         }
 
         void SendUnicode(char ch)
