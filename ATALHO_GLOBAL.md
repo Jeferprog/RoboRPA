@@ -78,6 +78,25 @@ Para o colega **trocar as frases** depois: icone na bandeja ->
 - Se um atalho aparecer como "com problema / ja em uso", escolha outra
   combinacao (algum outro programa ja usa aquela).
 
+## Modo colar (escrita instantanea)
+
+No `keyboard_trigger_manager.html` ha um checkbox **"Modo colar"**. Marcado,
+ele inclui `"@mode": "paste"` no `phrases.json` e no instalador
+automaticamente - nao precisa editar nada a mao. Recomendado para
+formularios web (Chrome/Edge). Para aplicar numa instalacao existente,
+gere o novo `phrases.json`/instalador e recarregue (bandeja -> Recarregar).
+
+## Atualizar frases num PC ja instalado
+
+Duas formas:
+
+1. **Pelo instalador** (mais simples): gere um novo instalador no HTML e
+   rode no PC. Ele **atualiza** o `phrases.json` (guardando o anterior em
+   `phrases.anterior.json`) e recompila. Reinicie o programa ou use
+   bandeja -> Recarregar.
+2. **Sem reinstalar**: bandeja -> **Abrir pasta das frases**, substitua o
+   `phrases.json` (baixado do HTML) e clique em **Recarregar frases**.
+
 ## Frase vindo cortada em site (Chrome/Edge)
 
 Alguns campos web (principalmente com mascara de CPF/telefone, ou com

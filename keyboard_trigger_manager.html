@@ -466,7 +466,11 @@
         <div class="card">
             <h2>📄 Preview - phrases.json</h2>
             <div class="json-preview" id="jsonPreview">{}</div>
-            <div class="button-group" style="margin-top: 15px;">
+            <label style="display:flex;align-items:center;gap:8px;margin:12px 0 4px;font-weight:500;cursor:pointer;">
+                <input type="checkbox" id="pasteMode" onchange="togglePasteMode()" style="width:18px;height:18px;cursor:pointer;">
+                Modo colar (escreve instantâneo — recomendado para formulários web)
+            </label>
+            <div class="button-group" style="margin-top: 8px;">
                 <button class="btn-success" onclick="downloadJSON()">⬇️ Baixar phrases.json</button>
                 <button class="btn-primary" onclick="generateInstaller()">📦 Baixar instalador (.bat)</button>
                 <button class="btn-info" onclick="copyToClipboard()">📋 Copiar JSON</button>
@@ -502,14 +506,47 @@
     <script>
         // Estado global
         let phrases = {};
+        let settings = { paste: false };
         let editingHotkey = null;
 
         // Inicializar
         document.addEventListener('DOMContentLoaded', function() {
             loadFromLocalStorage();
+            loadSettings();
             renderPhrases();
             updateStats();
         });
+
+        function saveSettings() {
+            try { localStorage.setItem('keyboardTriggerSettings', JSON.stringify(settings)); } catch (e) {}
+        }
+
+        function loadSettings() {
+            try {
+                const s = localStorage.getItem('keyboardTriggerSettings');
+                if (s) settings = JSON.parse(s);
+            } catch (e) {}
+            const cb = document.getElementById('pasteMode');
+            if (cb) cb.checked = !!settings.paste;
+        }
+
+        function togglePasteMode() {
+            settings.paste = document.getElementById('pasteMode').checked;
+            saveSettings();
+            renderJSON();
+        }
+
+        // Monta o objeto exportado: "@mode":"paste" (se marcado) + as frases
+        function buildExportObject() {
+            const obj = {};
+            if (settings.paste) obj['@mode'] = 'paste';
+            for (const k in phrases) obj[k] = phrases[k];
+            return obj;
+        }
+
+        function exportJsonString() {
+            return JSON.stringify(buildExportObject(), null, 2);
+        }
 
         // ============================================
         // GERENCIAMENTO DE DADOS
@@ -639,9 +676,10 @@
 
         function renderJSON() {
             const container = document.getElementById('jsonPreview');
-            const jsonString = JSON.stringify(phrases, null, 2);
+            const exportObj = buildExportObject();
+            const jsonString = JSON.stringify(exportObj, null, 2);
 
-            if (Object.keys(phrases).length === 0) {
+            if (Object.keys(exportObj).length === 0) {
                 container.textContent = '{}';
                 return;
             }
@@ -676,7 +714,7 @@
                 return;
             }
 
-            const dataStr = JSON.stringify(phrases, null, 2);
+            const dataStr = exportJsonString();
             const dataBlob = new Blob([dataStr], { type: 'application/json' });
             const url = URL.createObjectURL(dataBlob);
             const link = document.createElement('a');
@@ -689,7 +727,7 @@
         }
 
         function copyToClipboard() {
-            const json = JSON.stringify(phrases, null, 2);
+            const json = exportJsonString();
             navigator.clipboard.writeText(json).then(() => {
                 showAlert('📋 JSON copiado para a área de transferência!', 'success');
             }).catch(() => {
@@ -722,15 +760,28 @@
                     throw new Error('JSON deve ser um objeto');
                 }
 
-                // Valida todos os hotkeys
+                // Separa configuracoes ("@...") das frases e valida os hotkeys
+                const newPhrases = {};
+                let pasteOn = false;
                 for (const key in imported) {
+                    if (key.charAt(0) === '@') {
+                        if (key.toLowerCase() === '@mode') {
+                            pasteOn = String(imported[key]).toLowerCase() === 'paste';
+                        }
+                        continue; // ignora outras configuracoes aqui
+                    }
                     if (!isValidHotkey(key)) {
                         throw new Error(`Hotkey inválido: ${key}`);
                     }
+                    newPhrases[key] = imported[key];
                 }
 
-                phrases = imported;
+                phrases = newPhrases;
+                settings.paste = pasteOn;
                 saveToLocalStorage();
+                saveSettings();
+                const cb = document.getElementById('pasteMode');
+                if (cb) cb.checked = settings.paste;
                 renderPhrases();
                 closeImportModal();
                 showAlert('✅ JSON importado com sucesso!', 'success');
@@ -809,11 +860,10 @@
             L.push(ktEmitB64(csB64, '%TMPB64%'));
             L.push('certutil -decode "%TMPB64%" "%DEST%\\KeyboardTrigger.cs" >nul');
             L.push('if not exist "%DEST%\\KeyboardTrigger.cs" ( echo ERRO: nao gravou o programa. & pause & exit /b 1 )');
-            L.push('REM ---- grava phrases.json (so se ainda nao existir, para nao apagar edicoes) ----');
-            L.push('if exist "%DEST%\\phrases.json" goto kt_compilar');
+            L.push('REM ---- grava phrases.json (faz backup do anterior, se houver) ----');
+            L.push('if exist "%DEST%\\phrases.json" copy /y "%DEST%\\phrases.json" "%DEST%\\phrases.anterior.json" >nul');
             L.push(ktEmitB64(jsonB64, '%TMPB64%'));
             L.push('certutil -decode "%TMPB64%" "%DEST%\\phrases.json" >nul');
-            L.push(':kt_compilar');
             L.push('del "%TMPB64%" >nul 2>&1');
             L.push('set "CSC=%WINDIR%\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe"');
             L.push('if not exist "%CSC%" set "CSC=%WINDIR%\\Microsoft.NET\\Framework\\v4.0.30319\\csc.exe"');
@@ -847,7 +897,7 @@
             var el = document.getElementById('kt-cs-b64');
             var csB64 = (el ? el.textContent : '').replace(/\s+/g, '');
             if (!csB64) { showAlert('❌ Fonte do programa nao encontrada no HTML', 'error'); return; }
-            var jsonStr = JSON.stringify(phrases, null, 2);
+            var jsonStr = exportJsonString();
             var jsonB64 = btoa(unescape(encodeURIComponent(jsonStr)));
             var bat = ktBuildBat(csB64, jsonB64);
             var blob = new Blob([bat], { type: 'application/octet-stream' });
