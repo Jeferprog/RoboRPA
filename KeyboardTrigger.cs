@@ -73,9 +73,9 @@ namespace KeyboardTrigger
         const int VK_SHIFT = 0x10, VK_CONTROL = 0x11, VK_MENU = 0x12, VK_LWIN = 0x5B, VK_RWIN = 0x5C;
 
         // ---------- configuracoes de digitacao (ajustaveis no phrases.json) ----------
-        int keyHoldMs = 12;     // tempo segurando cada tecla
-        int charDelayMs = 8;    // pausa entre uma tecla e a proxima
-        bool pasteMode = false; // true = cola via Ctrl+V em vez de digitar
+        int keyHoldMs = 4;      // tempo segurando cada tecla
+        int charDelayMs = 4;    // pausa entre uma tecla e a proxima
+        bool pasteMode = false; // true = cola via Ctrl+V em vez de digitar (instantaneo)
 
         // ---------- estado ----------
         readonly string configPath;
@@ -132,6 +132,7 @@ namespace KeyboardTrigger
             ContextMenuStrip menu = new ContextMenuStrip();
             menu.Items.Add("Ver atalhos", null, delegate { ShowHotkeys(); });
             menu.Items.Add("Recarregar frases", null, delegate { ReloadAll(); });
+            menu.Items.Add("Abrir pasta das frases", null, delegate { OpenConfigFolder(); });
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Sair", null, delegate { ExitApp(); });
             tray.ContextMenuStrip = menu;
@@ -145,8 +146,8 @@ namespace KeyboardTrigger
             failed.Clear();
 
             // valores padrao (podem ser sobrescritos por "@..." no phrases.json)
-            keyHoldMs = 12;
-            charDelayMs = 8;
+            keyHoldMs = 4;
+            charDelayMs = 4;
             pasteMode = false;
 
             Log("LoadAndRegister: config=" + configPath + " existe=" + File.Exists(configPath));
@@ -250,6 +251,12 @@ namespace KeyboardTrigger
             sb.AppendLine("Frases lidas de:");
             sb.AppendLine("  " + configPath);
             MessageBox.Show(sb.ToString(), "Keyboard Trigger");
+        }
+
+        void OpenConfigFolder()
+        {
+            try { System.Diagnostics.Process.Start("explorer.exe", "\"" + Path.GetDirectoryName(configPath) + "\""); }
+            catch (Exception ex) { Log("OpenConfigFolder falhou: " + ex.Message); }
         }
 
         void ExitApp()

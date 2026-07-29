@@ -17,8 +17,10 @@ if not exist "%CSC%" (
     exit /b 1
 )
 
-REM Fecha instancia anterior para poder regravar o .exe
+REM Fecha instancia anterior e espera liberar o arquivo antes de regravar
 taskkill /im KeyboardTrigger.exe /f >nul 2>&1
+ping -n 2 127.0.0.1 >nul
+del KeyboardTrigger.exe >nul 2>&1
 
 echo.
 echo Compilando KeyboardTrigger.exe ...

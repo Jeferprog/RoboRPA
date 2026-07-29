@@ -33,11 +33,34 @@ cadastrada e digitada sozinha, como se voce tivesse digitado.
 4. (Opcional) De **duplo-clique** em `criar_inicializacao_exe.bat` para
    ele subir sozinho toda vez que voce entrar no Windows.
 
+## Compartilhar com colegas (1 arquivo so)
+
+O `keyboard_trigger_manager.html` gera um **instalador unico** com o programa
+ja embutido. Para preparar para um colega:
+
+1. Abra o `keyboard_trigger_manager.html`.
+2. Cadastre as frases/atalhos que ele vai usar (ou deixe as suas como base).
+3. Clique em **"Baixar instalador (.bat)"** -> gera `KeyboardTrigger_Instalar.bat`.
+4. Envie **esse unico arquivo** para o colega.
+
+O colega so precisa dar **duplo-clique** no `.bat`. Ele sozinho:
+- cria a pasta `%LOCALAPPDATA%\KeyboardTrigger`,
+- grava o programa e as frases,
+- compila com o compilador que ja vem no Windows,
+- inicia na bandeja e configura para abrir junto com o Windows.
+
+Nao precisa instalar nada, nao precisa de internet e nao precisa de admin.
+
+Para o colega **trocar as frases** depois: icone na bandeja ->
+**Abrir pasta das frases** -> editar/substituir o `phrases.json`
+(ou gerar um novo no HTML) -> **Recarregar frases**.
+
 ## Dia a dia
 
 - Icone na **bandeja** (perto do relogio) -> botao direito:
   - **Ver atalhos** - lista o que esta ativo.
   - **Recarregar frases** - depois de trocar o `phrases.json`.
+  - **Abrir pasta das frases** - abre a pasta onde esta o `phrases.json`.
   - **Sair** - encerra o programa.
 
 ## Trocar / adicionar frases
@@ -54,6 +77,25 @@ cadastrada e digitada sozinha, como se voce tivesse digitado.
   - uma tecla de funcao `F1`-`F12` (ex: `Ctrl+Alt+F2`)
 - Se um atalho aparecer como "com problema / ja em uso", escolha outra
   combinacao (algum outro programa ja usa aquela).
+
+## Modo colar (escrita instantanea)
+
+No `keyboard_trigger_manager.html` ha um checkbox **"Modo colar"**. Marcado,
+ele inclui `"@mode": "paste"` no `phrases.json` e no instalador
+automaticamente - nao precisa editar nada a mao. Recomendado para
+formularios web (Chrome/Edge). Para aplicar numa instalacao existente,
+gere o novo `phrases.json`/instalador e recarregue (bandeja -> Recarregar).
+
+## Atualizar frases num PC ja instalado
+
+Duas formas:
+
+1. **Pelo instalador** (mais simples): gere um novo instalador no HTML e
+   rode no PC. Ele **atualiza** o `phrases.json` (guardando o anterior em
+   `phrases.anterior.json`) e recompila. Reinicie o programa ou use
+   bandeja -> Recarregar.
+2. **Sem reinstalar**: bandeja -> **Abrir pasta das frases**, substitua o
+   `phrases.json` (baixado do HTML) e clique em **Recarregar frases**.
 
 ## Frase vindo cortada em site (Chrome/Edge)
 
@@ -85,8 +127,10 @@ de para deixar mais lento com estas linhas (tambem no inicio do JSON):
 }
 ```
 
-- `@keyHoldMs` = tempo segurando cada tecla (padrao 12)
-- `@charDelayMs` = pausa entre uma tecla e a proxima (padrao 8)
+- `@keyHoldMs` = tempo segurando cada tecla (padrao 4)
+- `@charDelayMs` = pausa entre uma tecla e a proxima (padrao 4)
+
+Para escrever **instantaneo**, prefira o modo colar (`"@mode": "paste"`).
 
 ## Se algo der errado
 
