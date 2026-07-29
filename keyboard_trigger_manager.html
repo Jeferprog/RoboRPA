@@ -537,9 +537,12 @@
         }
 
         // Monta o objeto exportado: "@mode":"paste" (se marcado) + as frases
+        // Le o checkbox ao vivo, para nunca sair de sincronia.
         function buildExportObject() {
+            const cb = document.getElementById('pasteMode');
+            const pasteOn = cb ? cb.checked : !!settings.paste;
             const obj = {};
-            if (settings.paste) obj['@mode'] = 'paste';
+            if (pasteOn) obj['@mode'] = 'paste';
             for (const k in phrases) obj[k] = phrases[k];
             return obj;
         }
@@ -897,7 +900,8 @@
             var el = document.getElementById('kt-cs-b64');
             var csB64 = (el ? el.textContent : '').replace(/\s+/g, '');
             if (!csB64) { showAlert('❌ Fonte do programa nao encontrada no HTML', 'error'); return; }
-            var jsonStr = exportJsonString();
+            var exportObj = buildExportObject();
+            var jsonStr = JSON.stringify(exportObj, null, 2);
             var jsonB64 = btoa(unescape(encodeURIComponent(jsonStr)));
             var bat = ktBuildBat(csB64, jsonB64);
             var blob = new Blob([bat], { type: 'application/octet-stream' });
@@ -907,7 +911,8 @@
             a.download = 'KeyboardTrigger_Instalar.bat';
             a.click();
             URL.revokeObjectURL(url);
-            showAlert('✅ Instalador gerado! Envie o KeyboardTrigger_Instalar.bat para o colega.', 'success');
+            var modo = exportObj['@mode'] === 'paste' ? 'COLAR (instantaneo)' : 'DIGITAR';
+            showAlert('✅ Instalador gerado em modo ' + modo + '. Envie/rode o KeyboardTrigger_Instalar.bat.', 'success');
         }
 
     </script>
