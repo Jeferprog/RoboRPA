@@ -55,6 +55,39 @@ cadastrada e digitada sozinha, como se voce tivesse digitado.
 - Se um atalho aparecer como "com problema / ja em uso", escolha outra
   combinacao (algum outro programa ja usa aquela).
 
+## Frase vindo cortada em site (Chrome/Edge)
+
+Alguns campos web (principalmente com mascara de CPF/telefone, ou com
+validacao em JavaScript) perdem caracteres quando a frase e digitada.
+Solucao: ligar o **modo colar**, que usa Ctrl+V em vez de digitar.
+
+Abra o `phrases.json` no Bloco de Notas e adicione a linha `"@mode": "paste",`
+logo depois da primeira chave `{`. Exemplo:
+
+```json
+{
+  "@mode": "paste",
+  "Ctrl+Shift+A": "Jeferson Demarchi Deimling\nCresol Cooperar"
+}
+```
+
+Depois, no icone da bandeja -> **Recarregar frases**. O balao vai mostrar
+"(modo colar)".
+
+Se preferir continuar **digitando** (sem colar), mas ainda vier cortado,
+de para deixar mais lento com estas linhas (tambem no inicio do JSON):
+
+```json
+{
+  "@keyHoldMs": "20",
+  "@charDelayMs": "15",
+  "Ctrl+Shift+A": "..."
+}
+```
+
+- `@keyHoldMs` = tempo segurando cada tecla (padrao 12)
+- `@charDelayMs` = pausa entre uma tecla e a proxima (padrao 8)
+
 ## Se algo der errado
 
 - Rode `compilar_debug.bat`: ele mostra os erros de compilacao e gera
