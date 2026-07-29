@@ -85,8 +85,10 @@ de para deixar mais lento com estas linhas (tambem no inicio do JSON):
 }
 ```
 
-- `@keyHoldMs` = tempo segurando cada tecla (padrao 12)
-- `@charDelayMs` = pausa entre uma tecla e a proxima (padrao 8)
+- `@keyHoldMs` = tempo segurando cada tecla (padrao 4)
+- `@charDelayMs` = pausa entre uma tecla e a proxima (padrao 4)
+
+Para escrever **instantaneo**, prefira o modo colar (`"@mode": "paste"`).
 
 ## Se algo der errado
 
