@@ -132,6 +132,7 @@ namespace KeyboardTrigger
             ContextMenuStrip menu = new ContextMenuStrip();
             menu.Items.Add("Ver atalhos", null, delegate { ShowHotkeys(); });
             menu.Items.Add("Recarregar frases", null, delegate { ReloadAll(); });
+            menu.Items.Add("Abrir pasta das frases", null, delegate { OpenConfigFolder(); });
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Sair", null, delegate { ExitApp(); });
             tray.ContextMenuStrip = menu;
@@ -250,6 +251,12 @@ namespace KeyboardTrigger
             sb.AppendLine("Frases lidas de:");
             sb.AppendLine("  " + configPath);
             MessageBox.Show(sb.ToString(), "Keyboard Trigger");
+        }
+
+        void OpenConfigFolder()
+        {
+            try { System.Diagnostics.Process.Start("explorer.exe", "\"" + Path.GetDirectoryName(configPath) + "\""); }
+            catch (Exception ex) { Log("OpenConfigFolder falhou: " + ex.Message); }
         }
 
         void ExitApp()

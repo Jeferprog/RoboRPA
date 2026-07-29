@@ -33,11 +33,34 @@ cadastrada e digitada sozinha, como se voce tivesse digitado.
 4. (Opcional) De **duplo-clique** em `criar_inicializacao_exe.bat` para
    ele subir sozinho toda vez que voce entrar no Windows.
 
+## Compartilhar com colegas (1 arquivo so)
+
+O `keyboard_trigger_manager.html` gera um **instalador unico** com o programa
+ja embutido. Para preparar para um colega:
+
+1. Abra o `keyboard_trigger_manager.html`.
+2. Cadastre as frases/atalhos que ele vai usar (ou deixe as suas como base).
+3. Clique em **"Baixar instalador (.bat)"** -> gera `KeyboardTrigger_Instalar.bat`.
+4. Envie **esse unico arquivo** para o colega.
+
+O colega so precisa dar **duplo-clique** no `.bat`. Ele sozinho:
+- cria a pasta `%LOCALAPPDATA%\KeyboardTrigger`,
+- grava o programa e as frases,
+- compila com o compilador que ja vem no Windows,
+- inicia na bandeja e configura para abrir junto com o Windows.
+
+Nao precisa instalar nada, nao precisa de internet e nao precisa de admin.
+
+Para o colega **trocar as frases** depois: icone na bandeja ->
+**Abrir pasta das frases** -> editar/substituir o `phrases.json`
+(ou gerar um novo no HTML) -> **Recarregar frases**.
+
 ## Dia a dia
 
 - Icone na **bandeja** (perto do relogio) -> botao direito:
   - **Ver atalhos** - lista o que esta ativo.
   - **Recarregar frases** - depois de trocar o `phrases.json`.
+  - **Abrir pasta das frases** - abre a pasta onde esta o `phrases.json`.
   - **Sair** - encerra o programa.
 
 ## Trocar / adicionar frases
