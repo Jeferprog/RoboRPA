@@ -5,9 +5,15 @@
   - Registra atalhos globais (ex: Ctrl+Alt+1) usando a API do
     Windows (RegisterHotKey) - funcionam em qualquer janela.
   - Ao apertar o atalho, "digita" a frase caractere a caractere
-    via SendInput/Unicode (funciona com acentos e simbolos).
+    via SendInput/Unicode (funciona com acentos e simbolos), ou
+    "cola" via Ctrl+V (modo paste), melhor para campos com mascara.
   - Fica na bandeja do sistema (perto do relogio). Botao direito
     para Recarregar frases, Ver atalhos ou Sair.
+
+  Ajustes opcionais no phrases.json (pares chave:valor):
+    "@mode": "paste"        -> cola em vez de digitar (bom p/ Chrome)
+    "@keyHoldMs": "15"      -> tempo segurando cada tecla (digitando)
+    "@charDelayMs": "10"    -> pausa entre teclas (digitando)
 
   Nao precisa de admin nem instalar nada. Compilar com o csc.exe
   que ja vem no Windows (veja compilar_e_iniciar.bat).
@@ -62,12 +68,14 @@ namespace KeyboardTrigger
         const uint KEYEVENTF_KEYUP = 0x0002;
         const uint KEYEVENTF_UNICODE = 0x0004;
         const ushort VK_RETURN = 0x0D;
+        const ushort VK_V = 0x56;
 
         const int VK_SHIFT = 0x10, VK_CONTROL = 0x11, VK_MENU = 0x12, VK_LWIN = 0x5B, VK_RWIN = 0x5C;
 
-        // Pausa entre cada tecla digitada (ms). Maior = mais lento, porem
-        // mais confiavel em campos web (Chrome/Edge). 12 costuma ir bem.
-        const int CHAR_DELAY_MS = 12;
+        // ---------- configuracoes de digitacao (ajustaveis no phrases.json) ----------
+        int keyHoldMs = 12;     // tempo segurando cada tecla
+        int charDelayMs = 8;    // pausa entre uma tecla e a proxima
+        bool pasteMode = false; // true = cola via Ctrl+V em vez de digitar
 
         // ---------- estado ----------
         readonly string configPath;
@@ -136,6 +144,11 @@ namespace KeyboardTrigger
             registered.Clear();
             failed.Clear();
 
+            // valores padrao (podem ser sobrescritos por "@..." no phrases.json)
+            keyHoldMs = 12;
+            charDelayMs = 8;
+            pasteMode = false;
+
             Log("LoadAndRegister: config=" + configPath + " existe=" + File.Exists(configPath));
             if (!File.Exists(configPath))
             {
@@ -158,11 +171,15 @@ namespace KeyboardTrigger
             }
 
             List<string[]> pairs = ParseJson(content);
-            Log("Frases lidas do JSON: " + pairs.Count);
+            Log("Pares lidos do JSON: " + pairs.Count);
             foreach (string[] kv in pairs)
             {
                 string hotkey = kv[0];
                 string text = kv[1];
+
+                // entradas comecando com "@" sao configuracoes, nao atalhos
+                if (hotkey.StartsWith("@")) { ApplySetting(hotkey, text); continue; }
+
                 uint mods, vk;
                 if (!TryParseHotkey(hotkey, out mods, out vk))
                 {
@@ -183,11 +200,24 @@ namespace KeyboardTrigger
                 }
             }
 
+            Log("Config: modo=" + (pasteMode ? "paste" : "type") + " keyHoldMs=" + keyHoldMs + " charDelayMs=" + charDelayMs);
             Log("Resumo: ativos=" + registered.Count + " problema=" + failed.Count);
-            string aviso = "Atalhos ativos: " + registered.Count;
+            string aviso = "Atalhos ativos: " + registered.Count + (pasteMode ? "  (modo colar)" : "");
             if (failed.Count > 0) aviso += "  (com problema: " + failed.Count + ")";
             tray.ShowBalloonTip(3000, "Keyboard Trigger", aviso, ToolTipIcon.Info);
         }
+
+        void ApplySetting(string key, string val)
+        {
+            string k = key.Trim().ToLowerInvariant();
+            int num;
+            if (k == "@keyholdms" && int.TryParse(val, out num)) keyHoldMs = Clamp(num, 0, 1000);
+            else if (k == "@chardelayms" && int.TryParse(val, out num)) charDelayMs = Clamp(num, 0, 1000);
+            else if (k == "@mode") pasteMode = (val.Trim().ToLowerInvariant() == "paste");
+            Log("Config aplicada: " + key + " = " + val);
+        }
+
+        static int Clamp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
         void UnregisterAll()
         {
@@ -214,6 +244,9 @@ namespace KeyboardTrigger
                 foreach (string f in failed) sb.AppendLine("  " + f);
             }
             sb.AppendLine();
+            sb.AppendLine("Modo: " + (pasteMode ? "colar (Ctrl+V)" : "digitar") +
+                          "   keyHoldMs=" + keyHoldMs + "  charDelayMs=" + charDelayMs);
+            sb.AppendLine();
             sb.AppendLine("Frases lidas de:");
             sb.AppendLine("  " + configPath);
             MessageBox.Show(sb.ToString(), "Keyboard Trigger");
@@ -237,16 +270,14 @@ namespace KeyboardTrigger
             base.WndProc(ref m);
         }
 
-        // ---------- digitar o texto ----------
+        // ---------- entregar o texto (digitar ou colar) ----------
         void TypeText(string text)
         {
-            // 1) solta os modificadores do atalho (Ctrl/Shift/Alt/Win) para
-            //    que nao interfiram nas teclas que vamos injetar.
+            // 1) solta os modificadores do atalho (Ctrl/Shift/Alt/Win)
             ReleaseModifiers();
 
-            // 2) espera o usuario tirar o dedo das teclas fisicas (ate ~500ms).
-            //    Sem isso, o navegador perde os primeiros caracteres.
-            for (int i = 0; i < 50; i++)
+            // 2) espera o usuario tirar o dedo das teclas fisicas (ate ~600ms)
+            for (int i = 0; i < 60; i++)
             {
                 bool held = GetAsyncKeyState(VK_CONTROL) < 0
                          || GetAsyncKeyState(VK_SHIFT) < 0
@@ -256,19 +287,53 @@ namespace KeyboardTrigger
                 if (!held) break;
                 Thread.Sleep(10);
             }
-            Thread.Sleep(70); // folga extra para o campo ficar pronto
+            Thread.Sleep(80); // folga para o campo ficar pronto
 
-            // 3) digita caractere a caractere, com pausa (campos web precisam).
             text = text.Replace("\r\n", "\n").Replace("\r", "\n");
+            Log("TypeText: len=" + text.Length + " modo=" + (pasteMode ? "paste" : "type"));
+
+            if (pasteMode) { PasteText(text); return; }
+
+            // 3) digita segurando cada tecla um pouco (mais confiavel no navegador)
             foreach (char c in text)
             {
-                if (c == '\n') SendVirtualKey(VK_RETURN);
-                else SendUnicode(c);
-                Thread.Sleep(CHAR_DELAY_MS);
+                if (c == '\n') TapVk(VK_RETURN);
+                else TapUnicode(c);
+                Thread.Sleep(charDelayMs);
             }
         }
 
-        // Solta Ctrl/Shift/Alt/Win (envia key-up) para limpar o estado fisico.
+        // ---------- modo colar ----------
+        void PasteText(string text)
+        {
+            string backup = null;
+            try { if (Clipboard.ContainsText()) backup = Clipboard.GetText(); }
+            catch (Exception ex) { Log("Clipboard backup falhou: " + ex.Message); }
+
+            try { if (text.Length > 0) Clipboard.SetText(text); }
+            catch (Exception ex) { Log("Clipboard.SetText falhou: " + ex.Message); }
+
+            Thread.Sleep(60);
+
+            // Ctrl+V
+            KeyDownVk((ushort)VK_CONTROL);
+            Thread.Sleep(5);
+            KeyDownVk(VK_V);
+            Thread.Sleep(keyHoldMs > 0 ? keyHoldMs : 12);
+            KeyUpVk(VK_V);
+            Thread.Sleep(5);
+            KeyUpVk((ushort)VK_CONTROL);
+            Thread.Sleep(150);
+
+            try
+            {
+                if (backup != null) Clipboard.SetText(backup);
+                else Clipboard.Clear();
+            }
+            catch { }
+        }
+
+        // ---------- helpers de teclado ----------
         void ReleaseModifiers()
         {
             int[] mods = { VK_CONTROL, VK_SHIFT, VK_MENU, VK_LWIN, VK_RWIN };
@@ -281,24 +346,29 @@ namespace KeyboardTrigger
             SendInput((uint)inp.Length, inp, Marshal.SizeOf(typeof(INPUT)));
         }
 
-        void SendUnicode(char ch)
+        void TapUnicode(char ch)
         {
-            INPUT[] inp = new INPUT[2];
-            inp[0].type = INPUT_KEYBOARD;
-            inp[0].u.ki = new KEYBDINPUT { wVk = 0, wScan = ch, dwFlags = KEYEVENTF_UNICODE, time = 0, dwExtraInfo = IntPtr.Zero };
-            inp[1].type = INPUT_KEYBOARD;
-            inp[1].u.ki = new KEYBDINPUT { wVk = 0, wScan = ch, dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, time = 0, dwExtraInfo = IntPtr.Zero };
-            SendInput(2, inp, Marshal.SizeOf(typeof(INPUT)));
+            SendOne(0, ch, KEYEVENTF_UNICODE);
+            Thread.Sleep(keyHoldMs);
+            SendOne(0, ch, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP);
         }
 
-        void SendVirtualKey(ushort vk)
+        void TapVk(ushort vk)
         {
-            INPUT[] inp = new INPUT[2];
-            inp[0].type = INPUT_KEYBOARD;
-            inp[0].u.ki = new KEYBDINPUT { wVk = vk, wScan = 0, dwFlags = 0, time = 0, dwExtraInfo = IntPtr.Zero };
-            inp[1].type = INPUT_KEYBOARD;
-            inp[1].u.ki = new KEYBDINPUT { wVk = vk, wScan = 0, dwFlags = KEYEVENTF_KEYUP, time = 0, dwExtraInfo = IntPtr.Zero };
-            SendInput(2, inp, Marshal.SizeOf(typeof(INPUT)));
+            SendOne(vk, 0, 0);
+            Thread.Sleep(keyHoldMs);
+            SendOne(vk, 0, KEYEVENTF_KEYUP);
+        }
+
+        void KeyDownVk(ushort vk) { SendOne(vk, 0, 0); }
+        void KeyUpVk(ushort vk) { SendOne(vk, 0, KEYEVENTF_KEYUP); }
+
+        void SendOne(ushort vk, ushort scan, uint flags)
+        {
+            INPUT[] a = new INPUT[1];
+            a[0].type = INPUT_KEYBOARD;
+            a[0].u.ki = new KEYBDINPUT { wVk = vk, wScan = scan, dwFlags = flags, time = 0, dwExtraInfo = IntPtr.Zero };
+            SendInput(1, a, Marshal.SizeOf(typeof(INPUT)));
         }
 
         // ---------- interpretar "Ctrl+Alt+1" ----------
