@@ -78,6 +78,26 @@ Para o colega **trocar as frases** depois: icone na bandeja ->
 - Se um atalho aparecer como "com problema / ja em uso", escolha outra
   combinacao (algum outro programa ja usa aquela).
 
+## Capturar da tela (copiar selecao e digitar)
+
+Da para "puxar" um texto que esta na tela (ex: um numero) e digita-lo em
+outro campo, usando dois atalhos:
+
+1. Um atalho com a frase **`@capturar`**: ao apertar, ele copia o texto
+   que estiver **selecionado** (faz Ctrl+C) e guarda na memoria.
+2. Outro atalho com a frase **`{numeros}`** (so os digitos) ou
+   **`{captura}`** (o texto inteiro): ao apertar, digita o que foi
+   capturado no campo onde esta o cursor.
+
+Tambem da para montar modelos, ex.: uma frase `Protocolo {numeros}`.
+
+Fluxo de uso:
+- Selecione o numero na tela -> aperte o atalho **@capturar**.
+- Clique no campo de destino -> aperte o atalho **{numeros}**.
+
+E confiavel porque usa o texto real da selecao (nao "le" a imagem).
+So funciona quando o texto e **selecionavel** (paginas, PDFs de texto...).
+
 ## Modo colar (escrita instantanea)
 
 No `keyboard_trigger_manager.html` ha um checkbox **"Modo colar"**. Marcado,
