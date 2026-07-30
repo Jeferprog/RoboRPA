@@ -384,6 +384,12 @@
             font-size: 0.9em;
         }
 
+        input#hotkey.recording {
+            border-color: #764ba2;
+            background: #faf7ff;
+            box-shadow: 0 0 12px rgba(118, 75, 162, 0.25);
+        }
+
         .hotkey-hint {
             font-size: 0.85em;
             color: #999;
@@ -437,8 +443,11 @@
                 <h2>➕ Adicionar/Editar Frase</h2>
                 <div class="form-group">
                     <label for="hotkey">Atalho (Hotkey)</label>
-                    <input type="text" id="hotkey" placeholder="Ex: Ctrl+Alt+1" value="">
-                    <div class="hotkey-hint">Use formato: Ctrl+Alt+1, Ctrl+Shift+A, etc.</div>
+                    <input type="text" id="hotkey" placeholder="Clique aqui e pressione as teclas..." value="" readonly
+                           onkeydown="onHotkeyKeyDown(event)"
+                           onfocus="this.classList.add('recording')" onblur="this.classList.remove('recording')"
+                           style="cursor:pointer;">
+                    <div class="hotkey-hint">Clique no campo e aperte a combinação (ex: segure Ctrl+Alt e aperte 1). Dica: Ctrl+Alt+tecla é o mais seguro. Esc limpa.</div>
                 </div>
                 <div class="form-group">
                     <label for="phrase">Texto da frase</label>
@@ -797,10 +806,62 @@
         // UTILIDADES
         // ============================================
 
+        // Detecta as teclas pressionadas e preenche o campo (ex: "Ctrl+Alt+1")
+        function onHotkeyKeyDown(e) {
+            const field = document.getElementById('hotkey');
+            if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'Delete') {
+                e.preventDefault();
+                field.value = '';
+                return;
+            }
+            e.preventDefault();
+            const mods = [];
+            if (e.ctrlKey) mods.push('Ctrl');
+            if (e.altKey) mods.push('Alt');
+            if (e.shiftKey) mods.push('Shift');
+            if (e.metaKey) mods.push('Win');
+            const key = ktKeyName(e);
+            if (key === null) {
+                // ainda so os modificadores: mostra parcial
+                field.value = mods.length ? (mods.join('+') + '+…') : '';
+                return;
+            }
+            if (mods.length === 0) {
+                field.value = '';
+                showAlert('⚠️ Use ao menos Ctrl, Alt ou Shift junto com a tecla', 'error');
+                return;
+            }
+            field.value = mods.concat([key]).join('+');
+        }
+
+        // Nome "limpo" da tecla principal a partir do evento (independe do layout)
+        function ktKeyName(e) {
+            const c = e.code || '';
+            const k = e.key || '';
+            if (['Control', 'Alt', 'Shift', 'Meta', 'OS', 'ContextMenu'].indexOf(k) !== -1) return null;
+            if (/^Key[A-Z]$/.test(c)) return c.slice(3);          // KeyA -> A
+            if (/^Digit[0-9]$/.test(c)) return c.slice(5);        // Digit1 -> 1
+            if (/^Numpad[0-9]$/.test(c)) return c.slice(6);       // Numpad1 -> 1
+            if (/^F([1-9]|1[0-9]|2[0-4])$/.test(c)) return c;     // F1..F24
+            if (/^[a-zA-Z0-9]$/.test(k)) return k.toUpperCase();  // fallback
+            return null;
+        }
+
+        // Valida atalho: modificadores (Ctrl/Alt/Shift/Win) + tecla (A-Z, 0-9 ou F1-F24)
         function isValidHotkey(hotkey) {
-            // Valida formato: Ctrl+Alt+1, Ctrl+Shift+A, etc.
-            const pattern = /^(Ctrl|Shift|Alt)\+((Ctrl|Shift|Alt)\+)?[A-Z0-9]$/;
-            return pattern.test(hotkey);
+            if (!hotkey) return false;
+            const parts = hotkey.split('+').map(p => p.trim()).filter(p => p.length);
+            if (parts.length < 2) return false; // ao menos 1 modificador + 1 tecla
+            const modSet = { ctrl: 1, control: 1, alt: 1, shift: 1, win: 1, windows: 1 };
+            for (let i = 0; i < parts.length; i++) {
+                const pl = parts[i].toLowerCase();
+                if (i < parts.length - 1) {
+                    if (!modSet[pl]) return false;
+                } else {
+                    if (!(/^[a-z0-9]$/.test(pl) || /^f([1-9]|1[0-9]|2[0-4])$/.test(pl))) return false;
+                }
+            }
+            return true;
         }
 
         function showAlert(message, type = 'info') {
