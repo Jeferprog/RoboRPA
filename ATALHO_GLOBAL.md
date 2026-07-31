@@ -91,6 +91,22 @@ outro campo, usando dois atalhos:
 
 Tambem da para montar modelos, ex.: uma frase `Protocolo {numeros}`.
 
+### Tabelas: pegar colunas especificas
+
+Ao capturar uma tabela (selecionar as linhas e Ctrl+C), as colunas vem
+separadas por Tab. Use marcadores de coluna (1 = primeira coluna):
+
+- **`{coluna:1}`** -> so a 1a coluna (um valor por linha).
+- **`{colunas:1,3}`** -> a 1a e a 3a coluna, lado a lado (separadas por Tab).
+
+Exemplo do caso "datas (col 1) e valores de Vencido (col 3)":
+1. Selecione a tabela na tela -> atalho **@capturar**.
+2. Clique no Excel/campo -> atalho com a frase **`{colunas:1,3}`**.
+
+Dica: **marque o "Modo colar"** para tabelas - assim cola direto nas
+celulas do Excel (Tab vira coluna, Enter vira linha). Se quiser sem o
+cabecalho, selecione a tabela ja sem a linha de titulo.
+
 Fluxo de uso:
 - Selecione o numero na tela -> aperte o atalho **@capturar**.
 - Clique no campo de destino -> aperte o atalho **{numeros}**.

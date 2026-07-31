@@ -23,6 +23,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Drawing;
 using System.Threading;
 using System.Windows.Forms;
@@ -291,12 +292,56 @@ namespace KeyboardTrigger
 
             // frase normal: troca os marcadores pela captura, se houver
             string outText = text;
+            if (outText.IndexOf("{col", StringComparison.OrdinalIgnoreCase) >= 0)
+                outText = ReplaceColumns(outText, captured);
             if (outText.IndexOf("{numeros}", StringComparison.OrdinalIgnoreCase) >= 0)
                 outText = ReplaceCI(outText, "{numeros}", DigitsOnly(captured));
             if (outText.IndexOf("{captura}", StringComparison.OrdinalIgnoreCase) >= 0)
                 outText = ReplaceCI(outText, "{captura}", captured);
 
             TypeText(outText);
+        }
+
+        // Troca {coluna:N} e {colunas:1,3} pelo conteudo das colunas da captura.
+        // A captura de uma tabela vem com colunas separadas por Tab e linhas por Enter.
+        static string ReplaceColumns(string input, string captured)
+        {
+            input = Regex.Replace(input, @"\{colunas?:([0-9,\s]+)\}",
+                m => ExtractColumns(captured, m.Groups[1].Value),
+                RegexOptions.IgnoreCase);
+            return input;
+        }
+
+        static string ExtractColumns(string captured, string spec)
+        {
+            List<int> idx = new List<int>();
+            foreach (string p in spec.Split(','))
+            {
+                int n;
+                if (int.TryParse(p.Trim(), out n) && n >= 1) idx.Add(n - 1);
+            }
+            if (idx.Count == 0) return "";
+
+            string norm = (captured ?? "").Replace("\r\n", "\n").Replace("\r", "\n");
+            string[] rows = norm.Split('\n');
+            StringBuilder outSb = new StringBuilder();
+            bool firstRow = true;
+            foreach (string row in rows)
+            {
+                if (row.Trim().Length == 0) continue; // pula linhas vazias
+                string[] cells = row.Split('\t');
+                StringBuilder line = new StringBuilder();
+                for (int j = 0; j < idx.Count; j++)
+                {
+                    if (j > 0) line.Append('\t');
+                    int ci = idx[j];
+                    line.Append(ci < cells.Length ? cells[ci].Trim() : "");
+                }
+                if (!firstRow) outSb.Append('\n');
+                outSb.Append(line.ToString());
+                firstRow = false;
+            }
+            return outSb.ToString();
         }
 
         // Copia a selecao atual (Ctrl+C) e guarda em memoria
