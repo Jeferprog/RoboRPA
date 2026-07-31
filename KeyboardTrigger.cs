@@ -302,11 +302,13 @@ namespace KeyboardTrigger
             TypeText(outText);
         }
 
-        // Troca {coluna:N} e {colunas:1,3} pelo conteudo das colunas da captura.
-        // A captura de uma tabela vem com colunas separadas por Tab e linhas por Enter.
+        // Troca {colunas:1,3} (ou {colunas:1,3/3}) pelo conteudo das colunas.
+        // Dois formatos de captura suportados:
+        //  - colunas separadas por Tab (padrao): {colunas:1,3}
+        //  - uma celula por linha (empilhado): {colunas:1,3/3}  (3 = total de colunas)
         static string ReplaceColumns(string input, string captured)
         {
-            input = Regex.Replace(input, @"\{colunas?:([0-9,\s]+)\}",
+            input = Regex.Replace(input, @"\{colunas?:([0-9,\s/]+)\}",
                 m => ExtractColumns(captured, m.Groups[1].Value),
                 RegexOptions.IgnoreCase);
             return input;
@@ -314,8 +316,18 @@ namespace KeyboardTrigger
 
         static string ExtractColumns(string captured, string spec)
         {
+            // spec: "1,3" (Tab) ou "1,3/3" (empilhado, com total de colunas)
+            int total = 0;
+            string selSpec = spec;
+            int bar = spec.IndexOf('/');
+            if (bar >= 0)
+            {
+                int.TryParse(spec.Substring(bar + 1).Trim(), out total);
+                selSpec = spec.Substring(0, bar);
+            }
+
             List<int> idx = new List<int>();
-            foreach (string p in spec.Split(','))
+            foreach (string p in selSpec.Split(','))
             {
                 int n;
                 if (int.TryParse(p.Trim(), out n) && n >= 1) idx.Add(n - 1);
@@ -323,19 +335,46 @@ namespace KeyboardTrigger
             if (idx.Count == 0) return "";
 
             string norm = (captured ?? "").Replace("\r\n", "\n").Replace("\r", "\n");
-            string[] rows = norm.Split('\n');
+
+            // linhas nao vazias
+            List<string> lines = new List<string>();
+            foreach (string ln in norm.Split('\n'))
+                if (ln.Trim().Length > 0) lines.Add(ln.Trim());
+
+            // monta as linhas da tabela (cada uma vira um vetor de celulas)
+            List<string[]> rows = new List<string[]>();
+            if (total >= 1)
+            {
+                // formato empilhado: reagrupa as celulas em linhas de 'total'
+                for (int i = 0; i < lines.Count; i += total)
+                {
+                    string[] cells = new string[total];
+                    for (int j = 0; j < total; j++)
+                        cells[j] = (i + j < lines.Count) ? lines[i + j] : "";
+                    rows.Add(cells);
+                }
+            }
+            else
+            {
+                // formato Tab: cada linha ja tem as colunas separadas por Tab
+                foreach (string ln in lines)
+                {
+                    string[] cells = ln.Split('\t');
+                    for (int k = 0; k < cells.Length; k++) cells[k] = cells[k].Trim();
+                    rows.Add(cells);
+                }
+            }
+
             StringBuilder outSb = new StringBuilder();
             bool firstRow = true;
-            foreach (string row in rows)
+            foreach (string[] cells in rows)
             {
-                if (row.Trim().Length == 0) continue; // pula linhas vazias
-                string[] cells = row.Split('\t');
                 StringBuilder line = new StringBuilder();
                 for (int j = 0; j < idx.Count; j++)
                 {
                     if (j > 0) line.Append('\t');
                     int ci = idx[j];
-                    line.Append(ci < cells.Length ? cells[ci].Trim() : "");
+                    line.Append(ci < cells.Length ? cells[ci] : "");
                 }
                 if (!firstRow) outSb.Append('\n');
                 outSb.Append(line.ToString());

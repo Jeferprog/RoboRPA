@@ -99,6 +99,15 @@ separadas por Tab. Use marcadores de coluna (1 = primeira coluna):
 - **`{coluna:1}`** -> so a 1a coluna (um valor por linha).
 - **`{colunas:1,3}`** -> a 1a e a 3a coluna, lado a lado (separadas por Tab).
 
+Alguns sistemas copiam a tabela "empilhada" (ao colar no Bloco de Notas,
+cada valor aparece numa linha separada, sem Tab). Nesse caso informe o
+TOTAL de colunas da tabela apos uma barra:
+
+- **`{colunas:1,3/3}`** -> tabela de 3 colunas empilhada; pega a 1a e a 3a.
+
+No gerenciador HTML basta preencher o campo "Total de colunas da tabela"
+ao cadastrar o atalho - ele monta o codigo sozinho.
+
 Exemplo do caso "datas (col 1) e valores de Vencido (col 3)":
 1. Selecione a tabela na tela -> atalho **@capturar**.
 2. Clique no Excel/campo -> atalho com a frase **`{colunas:1,3}`**.
