@@ -78,6 +78,42 @@ Para o colega **trocar as frases** depois: icone na bandeja ->
 - Se um atalho aparecer como "com problema / ja em uso", escolha outra
   combinacao (algum outro programa ja usa aquela).
 
+## Capturar da tela (copiar selecao e digitar)
+
+Da para "puxar" um texto que esta na tela (ex: um numero) e digita-lo em
+outro campo, usando dois atalhos:
+
+1. Um atalho com a frase **`@capturar`**: ao apertar, ele copia o texto
+   que estiver **selecionado** (faz Ctrl+C) e guarda na memoria.
+2. Outro atalho com a frase **`{numeros}`** (so os digitos) ou
+   **`{captura}`** (o texto inteiro): ao apertar, digita o que foi
+   capturado no campo onde esta o cursor.
+
+Tambem da para montar modelos, ex.: uma frase `Protocolo {numeros}`.
+
+### Tabelas: pegar colunas especificas
+
+Ao capturar uma tabela (selecionar as linhas e Ctrl+C), as colunas vem
+separadas por Tab. Use marcadores de coluna (1 = primeira coluna):
+
+- **`{coluna:1}`** -> so a 1a coluna (um valor por linha).
+- **`{colunas:1,3}`** -> a 1a e a 3a coluna, lado a lado (separadas por Tab).
+
+Exemplo do caso "datas (col 1) e valores de Vencido (col 3)":
+1. Selecione a tabela na tela -> atalho **@capturar**.
+2. Clique no Excel/campo -> atalho com a frase **`{colunas:1,3}`**.
+
+Dica: **marque o "Modo colar"** para tabelas - assim cola direto nas
+celulas do Excel (Tab vira coluna, Enter vira linha). Se quiser sem o
+cabecalho, selecione a tabela ja sem a linha de titulo.
+
+Fluxo de uso:
+- Selecione o numero na tela -> aperte o atalho **@capturar**.
+- Clique no campo de destino -> aperte o atalho **{numeros}**.
+
+E confiavel porque usa o texto real da selecao (nao "le" a imagem).
+So funciona quando o texto e **selecionavel** (paginas, PDFs de texto...).
+
 ## Modo colar (escrita instantanea)
 
 No `keyboard_trigger_manager.html` ha um checkbox **"Modo colar"**. Marcado,

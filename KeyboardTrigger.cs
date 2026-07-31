@@ -23,6 +23,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Drawing;
 using System.Threading;
 using System.Windows.Forms;
@@ -84,6 +85,7 @@ namespace KeyboardTrigger
         readonly List<string> failed = new List<string>();
         int nextId = 1;
         NotifyIcon tray;
+        string captured = ""; // ultimo texto capturado da selecao (@capturar)
 
         // ---------- log (para diagnostico) ----------
         static string LogPath { get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "keyboardtrigger_log.txt"); } }
@@ -272,9 +274,143 @@ namespace KeyboardTrigger
             {
                 int id = m.WParam.ToInt32();
                 string text;
-                if (idToText.TryGetValue(id, out text)) TypeText(text);
+                if (idToText.TryGetValue(id, out text)) HandleHotkey(text);
             }
             base.WndProc(ref m);
+        }
+
+        // Decide o que o atalho faz: capturar a selecao ou digitar/colar a frase
+        void HandleHotkey(string text)
+        {
+            string t = (text ?? "").Trim();
+            if (t.Equals("@capturar", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("@copiar", StringComparison.OrdinalIgnoreCase))
+            {
+                CaptureSelection();
+                return;
+            }
+
+            // frase normal: troca os marcadores pela captura, se houver
+            string outText = text;
+            if (outText.IndexOf("{col", StringComparison.OrdinalIgnoreCase) >= 0)
+                outText = ReplaceColumns(outText, captured);
+            if (outText.IndexOf("{numeros}", StringComparison.OrdinalIgnoreCase) >= 0)
+                outText = ReplaceCI(outText, "{numeros}", DigitsOnly(captured));
+            if (outText.IndexOf("{captura}", StringComparison.OrdinalIgnoreCase) >= 0)
+                outText = ReplaceCI(outText, "{captura}", captured);
+
+            TypeText(outText);
+        }
+
+        // Troca {coluna:N} e {colunas:1,3} pelo conteudo das colunas da captura.
+        // A captura de uma tabela vem com colunas separadas por Tab e linhas por Enter.
+        static string ReplaceColumns(string input, string captured)
+        {
+            input = Regex.Replace(input, @"\{colunas?:([0-9,\s]+)\}",
+                m => ExtractColumns(captured, m.Groups[1].Value),
+                RegexOptions.IgnoreCase);
+            return input;
+        }
+
+        static string ExtractColumns(string captured, string spec)
+        {
+            List<int> idx = new List<int>();
+            foreach (string p in spec.Split(','))
+            {
+                int n;
+                if (int.TryParse(p.Trim(), out n) && n >= 1) idx.Add(n - 1);
+            }
+            if (idx.Count == 0) return "";
+
+            string norm = (captured ?? "").Replace("\r\n", "\n").Replace("\r", "\n");
+            string[] rows = norm.Split('\n');
+            StringBuilder outSb = new StringBuilder();
+            bool firstRow = true;
+            foreach (string row in rows)
+            {
+                if (row.Trim().Length == 0) continue; // pula linhas vazias
+                string[] cells = row.Split('\t');
+                StringBuilder line = new StringBuilder();
+                for (int j = 0; j < idx.Count; j++)
+                {
+                    if (j > 0) line.Append('\t');
+                    int ci = idx[j];
+                    line.Append(ci < cells.Length ? cells[ci].Trim() : "");
+                }
+                if (!firstRow) outSb.Append('\n');
+                outSb.Append(line.ToString());
+                firstRow = false;
+            }
+            return outSb.ToString();
+        }
+
+        // Copia a selecao atual (Ctrl+C) e guarda em memoria
+        void CaptureSelection()
+        {
+            ReleaseModifiers();
+            for (int i = 0; i < 60; i++)
+            {
+                bool held = GetAsyncKeyState(VK_CONTROL) < 0 || GetAsyncKeyState(VK_SHIFT) < 0
+                         || GetAsyncKeyState(VK_MENU) < 0 || GetAsyncKeyState(VK_LWIN) < 0 || GetAsyncKeyState(VK_RWIN) < 0;
+                if (!held) break;
+                Thread.Sleep(10);
+            }
+            Thread.Sleep(60);
+
+            // Ctrl+C
+            KeyDownVk((ushort)VK_CONTROL);
+            Thread.Sleep(5);
+            KeyDownVk(0x43); // tecla C
+            Thread.Sleep(25);
+            KeyUpVk(0x43);
+            Thread.Sleep(5);
+            KeyUpVk((ushort)VK_CONTROL);
+            Thread.Sleep(160); // tempo para o app colocar no clipboard
+
+            string val = "";
+            try { if (Clipboard.ContainsText()) val = Clipboard.GetText(); }
+            catch (Exception ex) { Log("Captura clipboard falhou: " + ex.Message); }
+            captured = (val ?? "").Trim();
+            Log("Capturado (" + captured.Length + " chars): " + captured);
+
+            if (tray != null)
+            {
+                string aviso = captured.Length > 0
+                    ? ("Capturado: " + Resumo(captured) + "   (numeros: " + DigitsOnly(captured) + ")")
+                    : "Nada selecionado para capturar";
+                tray.ShowBalloonTip(2500, "Keyboard Trigger", aviso, ToolTipIcon.Info);
+            }
+        }
+
+        static string DigitsOnly(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            StringBuilder sb = new StringBuilder();
+            foreach (char c in s) if (c >= '0' && c <= '9') sb.Append(c);
+            return sb.ToString();
+        }
+
+        static string ReplaceCI(string input, string token, string val)
+        {
+            StringBuilder sb = new StringBuilder();
+            int i = 0;
+            while (i < input.Length)
+            {
+                if (i + token.Length <= input.Length &&
+                    string.Compare(input, i, token, 0, token.Length, StringComparison.OrdinalIgnoreCase) == 0)
+                {
+                    sb.Append(val);
+                    i += token.Length;
+                }
+                else { sb.Append(input[i]); i++; }
+            }
+            return sb.ToString();
+        }
+
+        static string Resumo(string s)
+        {
+            s = s.Replace("\r", " ").Replace("\n", " ");
+            return s.Length > 40 ? s.Substring(0, 40) + "..." : s;
         }
 
         // ---------- entregar o texto (digitar ou colar) ----------
