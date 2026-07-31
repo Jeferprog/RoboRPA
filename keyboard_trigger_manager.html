@@ -450,11 +450,32 @@
                     <div class="hotkey-hint">Clique no campo e aperte a combinação (ex: segure Ctrl+Alt e aperte 1). Dica: Ctrl+Alt+tecla é o mais seguro. Esc limpa.</div>
                 </div>
                 <div class="form-group">
-                    <label for="phrase">Texto da frase</label>
+                    <label for="tipo">O que esse atalho faz?</label>
+                    <select id="tipo" onchange="onTipoChange(true)"
+                            style="width:100%;padding:12px;border:2px solid #e0e0e0;border-radius:8px;font-size:1em;cursor:pointer;background:#fff;">
+                        <option value="texto">✍️ Escrever um texto fixo (frase, assinatura...)</option>
+                        <option value="capturar">📋 Copiar o texto selecionado na tela</option>
+                        <option value="numeros">🔢 Escrever só os NÚMEROS do que foi copiado</option>
+                        <option value="captura">📝 Escrever o TEXTO do que foi copiado</option>
+                        <option value="colunas">📊 Escrever COLUNAS de uma tabela copiada</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="grupoTexto">
+                    <label for="phrase">Texto a escrever</label>
                     <textarea id="phrase" placeholder="Digite sua frase aqui...&#10;Suporta múltiplas linhas"></textarea>
-                    <div class="hotkey-hint">Use \n para quebra de linha (ou Enter).<br>
-                    Especiais: escreva <b>@capturar</b> para o atalho copiar o texto selecionado; e use <b>{numeros}</b> (só dígitos) ou <b>{captura}</b> (texto inteiro) numa frase para digitar o que foi capturado. Ex.: um atalho <b>@capturar</b> e outro <b>{numeros}</b>.<br>
-                    Tabelas: capture a tabela e use <b>{colunas:1,3}</b> para pegar a 1ª e a 3ª coluna (ou <b>{coluna:1}</b> para uma só). Marque o "Modo colar" para colar certinho no Excel.</div>
+                    <div class="hotkey-hint">Use Enter para quebra de linha.</div>
+                </div>
+
+                <div class="form-group" id="grupoColunas" style="display:none;">
+                    <label for="colunas">Quais colunas? (ex.: 1,3 = 1ª e 3ª)</label>
+                    <input type="text" id="colunas" placeholder="1,3"
+                           style="width:100%;padding:12px;border:2px solid #e0e0e0;border-radius:8px;font-size:1em;">
+                    <div class="hotkey-hint">Números da tabela separados por vírgula.</div>
+                </div>
+
+                <div class="form-group" id="grupoInfo" style="display:none;">
+                    <div class="hotkey-hint" id="infoAcao" style="font-style:normal;"></div>
                 </div>
                 <div class="button-group">
                     <button class="btn-primary" onclick="addOrUpdatePhrase()">💾 Salvar Frase</button>
@@ -524,6 +545,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadFromLocalStorage();
             loadSettings();
+            onTipoChange(false);
             renderPhrases();
             updateStats();
         });
@@ -586,27 +608,64 @@
             }
         }
 
+        // Mostra/esconde campos conforme o tipo de atalho escolhido
+        function onTipoChange(userAction) {
+            const tipo = document.getElementById('tipo').value;
+            document.getElementById('grupoTexto').style.display = (tipo === 'texto') ? '' : 'none';
+            document.getElementById('grupoColunas').style.display = (tipo === 'colunas') ? '' : 'none';
+
+            let msg = '';
+            if (tipo === 'capturar') msg = '📋 Este atalho vai COPIAR o que estiver selecionado na tela — para depois você escrever com outro atalho.';
+            else if (tipo === 'numeros') msg = '🔢 Este atalho escreve só os números do que foi copiado (ex.: 1079842).';
+            else if (tipo === 'captura') msg = '📝 Este atalho escreve o texto do que foi copiado.';
+            else if (tipo === 'colunas') msg = '📊 Este atalho escreve as colunas escolhidas da tabela copiada. Dica: deixe o "Modo colar" ligado para colar no Excel.';
+            document.getElementById('grupoInfo').style.display = msg ? '' : 'none';
+            document.getElementById('infoAcao').textContent = msg;
+
+            // Só quando o usuário escolhe "colunas": liga o Modo colar automaticamente
+            if (userAction && tipo === 'colunas') {
+                const cb = document.getElementById('pasteMode');
+                if (cb && !cb.checked) {
+                    cb.checked = true;
+                    togglePasteMode();
+                    showAlert('ℹ️ Liguei o "Modo colar" (recomendado para tabelas).', 'info');
+                }
+            }
+        }
+
         function addOrUpdatePhrase() {
             const hotkey = document.getElementById('hotkey').value.trim();
-            const phrase = document.getElementById('phrase').value.trim();
 
             if (!hotkey) {
-                showAlert('⚠️ Digite um atalho (hotkey)', 'error');
+                showAlert('⚠️ Defina o atalho: clique no campo e aperte as teclas', 'error');
                 return;
             }
-
-            if (!phrase) {
-                showAlert('⚠️ Digite uma frase', 'error');
-                return;
-            }
-
-            // Valida formato do hotkey
             if (!isValidHotkey(hotkey)) {
-                showAlert('❌ Formato de hotkey inválido. Use: Ctrl+Alt+1, Ctrl+Shift+A, etc.', 'error');
+                showAlert('❌ Atalho inválido. Use Ctrl/Alt/Shift/Win + uma tecla.', 'error');
                 return;
             }
 
-            // Se estava editando, remove a antiga
+            // Monta o "texto" conforme o tipo escolhido
+            const tipo = document.getElementById('tipo').value;
+            let phrase = '';
+            if (tipo === 'texto') {
+                phrase = document.getElementById('phrase').value.trim();
+                if (!phrase) { showAlert('⚠️ Digite o texto a escrever', 'error'); return; }
+            } else if (tipo === 'capturar') {
+                phrase = '@capturar';
+            } else if (tipo === 'numeros') {
+                phrase = '{numeros}';
+            } else if (tipo === 'captura') {
+                phrase = '{captura}';
+            } else if (tipo === 'colunas') {
+                const cols = document.getElementById('colunas').value.trim();
+                if (!/^\s*\d+(\s*,\s*\d+)*\s*$/.test(cols)) {
+                    showAlert('⚠️ Informe as colunas, ex.: 1,3', 'error');
+                    return;
+                }
+                phrase = '{colunas:' + cols.replace(/\s+/g, '') + '}';
+            }
+
             if (editingHotkey && editingHotkey !== hotkey) {
                 delete phrases[editingHotkey];
             }
@@ -614,10 +673,7 @@
             phrases[hotkey] = phrase;
             saveToLocalStorage();
             renderPhrases();
-
-            const msg = editingHotkey ? '✏️ Frase atualizada!' : '✅ Frase adicionada!';
-            showAlert(msg, 'success');
-
+            showAlert(editingHotkey ? '✏️ Atalho atualizado!' : '✅ Atalho adicionado!', 'success');
             clearForm();
         }
 
@@ -632,19 +688,43 @@
         }
 
         function editPhrase(hotkey) {
-            const phrase = phrases[hotkey];
+            const phrase = phrases[hotkey] || '';
             document.getElementById('hotkey').value = hotkey;
-            document.getElementById('phrase').value = phrase;
+
+            // Detecta o tipo a partir do valor guardado
+            const tipoSel = document.getElementById('tipo');
+            const low = phrase.trim().toLowerCase();
+            const mCol = phrase.trim().match(/^\{colunas?:([0-9,\s]+)\}$/i);
+            document.getElementById('phrase').value = '';
+            document.getElementById('colunas').value = '';
+            if (low === '@capturar' || low === '@copiar') {
+                tipoSel.value = 'capturar';
+            } else if (low === '{numeros}') {
+                tipoSel.value = 'numeros';
+            } else if (low === '{captura}') {
+                tipoSel.value = 'captura';
+            } else if (mCol) {
+                tipoSel.value = 'colunas';
+                document.getElementById('colunas').value = mCol[1].replace(/\s+/g, '');
+            } else {
+                tipoSel.value = 'texto';
+                document.getElementById('phrase').value = phrase;
+            }
+            onTipoChange(false);
+
             editingHotkey = hotkey;
-            document.querySelector('.card h2').textContent = '✏️ Editar Frase';
+            document.querySelector('.card h2').textContent = '✏️ Editar Atalho';
             document.getElementById('hotkey').focus();
         }
 
         function clearForm() {
             document.getElementById('hotkey').value = '';
             document.getElementById('phrase').value = '';
+            document.getElementById('colunas').value = '';
+            document.getElementById('tipo').value = 'texto';
+            onTipoChange(false);
             editingHotkey = null;
-            document.querySelector('.card h2').textContent = '➕ Adicionar/Editar Frase';
+            document.querySelector('.card h2').textContent = '➕ Adicionar/Editar Atalho';
         }
 
         function clearAllPhrases() {
@@ -661,6 +741,18 @@
         // RENDERIZAÇÃO
         // ============================================
 
+        // Descricao amigavel do valor guardado (para a lista)
+        function friendlyValue(phrase) {
+            const p = (phrase || '').trim();
+            const low = p.toLowerCase();
+            const mCol = p.match(/^\{colunas?:([0-9,\s]+)\}$/i);
+            if (low === '@capturar' || low === '@copiar') return '📋 Copia o texto selecionado';
+            if (low === '{numeros}') return '🔢 Escreve só os números copiados';
+            if (low === '{captura}') return '📝 Escreve o texto copiado';
+            if (mCol) return '📊 Escreve as colunas ' + mCol[1].replace(/\s+/g, '') + ' da tabela copiada';
+            return phrase;
+        }
+
         function renderPhrases() {
             const container = document.getElementById('phrasesList');
 
@@ -675,7 +767,7 @@
                     <div class="phrase-item">
                         <div class="phrase-info">
                             <div class="hotkey">🔑 ${escapeHtml(hotkey)}</div>
-                            <div class="phrase-text">${escapeHtml(phrase)}</div>
+                            <div class="phrase-text">${escapeHtml(friendlyValue(phrase))}</div>
                         </div>
                         <div class="phrase-actions">
                             <button class="btn-secondary btn-small" onclick="editPhrase('${escapeJs(hotkey)}')">✏️ Editar</button>
