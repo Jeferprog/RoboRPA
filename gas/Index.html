@@ -1,0 +1,2307 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cresol RPA Web - Offline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+  <style>
+    /* =========================================
+       ESTILOS — Material Design 3 (paleta Cresol)
+       Tokens de cor inspirados no design enterprise.
+       ========================================= */
+    :root {
+      --primary: #00402d;            /* verde Cresol profundo */
+      --primary-container: #005a40;  /* verde container */
+      --on-primary: #ffffff;
+      --secondary: #a63b00;          /* laranja escuro */
+      --secondary-container: #fc6c29;/* laranja vivo (acento) */
+      --accent: #F26522;             /* laranja da marca */
+      --background: #f8f9fb;
+      --surface: #ffffff;
+      --surface-low: #f3f4f6;
+      --surface-bright: #fbfcfe;
+      --on-surface: #191c1e;
+      --on-surface-variant: #3f4943;
+      --outline: #6f7973;
+      --outline-variant: #bfc9c2;
+      --error: #ba1a1a;
+      --error-container: #ffdad6;
+      --on-error-container: #410002;
+      --radius-lg: 0.5rem;
+      --radius-xl: 0.75rem;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 6px 16px -8px rgba(0,0,0,0.18);
+    }
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', 'Segoe UI', Tahoma, sans-serif; margin: 0; background-color: var(--background); color: var(--on-surface); height: 100vh; display: flex; flex-direction: column; -webkit-font-smoothing: antialiased; }
+    h1, h2, h3, p { margin: 0; }
+    button { cursor: pointer; border: none; background: none; font-family: inherit; transition: all 0.2s; }
+    input, select, textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--outline-variant); border-radius: var(--radius-lg); font-family: inherit; font-size: 14px; background: var(--surface); color: var(--on-surface); transition: border-color 0.15s, box-shadow 0.15s; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary-container); box-shadow: 0 0 0 3px rgba(0,90,64,0.12); }
+    .material-symbols-outlined { font-family: 'Material Symbols Outlined'; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; vertical-align: middle; line-height: 1; user-select: none; }
+    .material-symbols-outlined.fill-icon { font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--outline-variant); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--outline); }
+
+    /* Alertas */
+    #storage-warning { display: none; background-color: var(--error-container); color: var(--on-error-container); padding: 12px; text-align: center; font-size: 14px; font-weight: 600; border-bottom: 1px solid #f4b4b0; }
+
+    /* Header */
+    .header { background-color: var(--primary); color: white; padding: 0 24px; height: 64px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 12px -4px rgba(0,64,45,0.4); flex-shrink: 0; z-index: 10; }
+    .header-title { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; display: flex; align-items: center; gap: 10px; }
+    .header-title span { color: var(--secondary-container); font-size: 26px; }
+    .nav-buttons { display: flex; align-items: center; }
+    .nav-buttons button { color: white; padding: 8px 16px; border-radius: var(--radius-lg); margin-left: 8px; font-weight: 600; opacity: 0.78; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+    .nav-buttons button.active { background-color: rgba(255,255,255,0.18); opacity: 1; box-shadow: inset 0 -2px 0 var(--secondary-container); }
+    .nav-buttons button:hover { background-color: rgba(255,255,255,0.13); opacity: 1; }
+
+    /* Layout Principal */
+    .container { max-width: 1440px; margin: 16px auto; display: flex; gap: 24px; flex: 1; width: 100%; padding: 0 24px; min-height: 0; }
+    .panel { background: var(--surface); border-radius: var(--radius-xl); box-shadow: var(--shadow-sm); border: 1px solid var(--outline-variant); display: flex; flex-direction: column; overflow: hidden; }
+    .hidden { display: none !important; }
+
+    /* Aba: Executar Robôs */
+    #runner-view, #settings-view { display: flex; width: 100%; gap: 24px; }
+    .sidebar { width: 320px; flex-shrink: 0; display: flex; flex-direction: column; }
+    .sidebar-header { padding: 16px 18px; background: var(--surface-bright); border-bottom: 1px solid var(--outline-variant); display: flex; justify-content: space-between; align-items: center; font-weight: 700; color: var(--on-surface); }
+    .btn-icon { padding: 7px 12px; border-radius: var(--radius-lg); color: var(--primary); font-size: 13px; font-weight: 600; background: rgba(0,90,64,0.08); display: inline-flex; align-items: center; gap: 4px; }
+    .btn-icon:hover { background: rgba(0,90,64,0.15); }
+    .script-list { flex: 1; overflow-y: auto; padding: 12px; }
+    .script-item { padding: 12px 14px; border-radius: var(--radius-lg); margin-bottom: 8px; cursor: pointer; border: 1px solid transparent; border-left: 3px solid transparent; transition: all 0.2s; }
+    .script-item:hover { background: var(--surface-low); }
+    .script-item.active { background: #e7f5ee; border-color: #a7e3c9; border-left-color: var(--primary-container); }
+    .script-item-title { font-weight: 600; color: var(--on-surface); }
+    .script-item.active .script-item-title { color: var(--primary); }
+    .script-item-desc { font-size: 12px; color: var(--on-surface-variant); margin-top: 4px; }
+
+    /* Backup Controls */
+    .backup-controls { padding: 12px; background: var(--surface-bright); border-top: 1px solid var(--outline-variant); display: flex; gap: 8px; }
+    .backup-controls button { flex: 1; padding: 9px; font-size: 12px; font-weight: 600; border-radius: var(--radius-lg); border: 1px solid var(--outline-variant); background: var(--surface); color: var(--on-surface-variant); }
+    .backup-controls button:hover { background: var(--surface-low); border-color: var(--outline); }
+
+    .main-content { flex: 1; padding: 32px; overflow-y: auto; }
+    .script-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; }
+    .script-title { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; color: var(--on-surface); }
+    .script-desc { color: var(--on-surface-variant); margin-top: 8px; font-size: 15px; }
+    .action-buttons { display: flex; gap: 12px; }
+    .btn-outline { border: 1px solid var(--outline-variant); padding: 9px 16px; border-radius: var(--radius-lg); color: var(--on-surface-variant); font-weight: 600; font-size: 14px; background: var(--surface); display: inline-flex; align-items: center; gap: 6px; }
+    .btn-outline:hover { background: var(--surface-low); border-color: var(--outline); }
+
+    .variables-section { background: var(--surface-bright); padding: 24px; border-radius: var(--radius-xl); border: 1px solid var(--outline-variant); margin-bottom: 32px; }
+    .variables-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--on-surface-variant); margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--on-surface-variant); }
+
+    .alert-box { background: #fff4ec; border: 1px solid #ffd9bf; padding: 20px; border-radius: var(--radius-xl); color: var(--secondary); font-size: 15px; margin-bottom: 32px; display: flex; gap: 16px; align-items: center; }
+    .btn-primary { background: var(--accent); color: white; padding: 14px 28px; border-radius: var(--radius-lg); font-weight: 700; font-size: 16px; display: inline-flex; align-items: center; gap: 10px; box-shadow: 0 4px 12px -2px rgba(242, 101, 34, 0.4); }
+    .btn-primary:hover { box-shadow: 0 6px 16px -2px rgba(242, 101, 34, 0.5); transform: translateY(-1px); }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-success { background: var(--primary); color: white; padding: 10px 20px; border-radius: var(--radius-lg); font-weight: 700; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; box-shadow: var(--shadow-sm); }
+    .btn-success:hover { background: var(--primary-container); }
+    .btn-success:active { transform: scale(0.98); }
+
+    /* Aba: Criar / Editar */
+    #creator-view { display: flex; width: 100%; padding: 16px 20px; flex-direction: column; }
+    .creator-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--outline-variant); padding-bottom: 20px; margin-bottom: 24px; }
+    .creator-columns { display: flex; gap: 32px; flex: 1; overflow: hidden; }
+    .col-left { width: 330px; flex-shrink: 0; display: flex; flex-direction: column; gap: 24px; overflow-y: auto; padding-right: 12px; }
+    .col-right { flex: 1; display: flex; flex-direction: column; background: var(--surface-bright); border: 1px solid var(--outline-variant); border-radius: var(--radius-xl); overflow: hidden; }
+
+    .var-card { background: var(--surface); border: 1px solid var(--outline-variant); padding: 16px; border-radius: var(--radius-lg); margin-bottom: 16px; position: relative; box-shadow: var(--shadow-sm); }
+    .var-card input.var-name { border: none; border-bottom: 1px solid var(--outline-variant); border-radius: 0; padding: 4px 0; margin-bottom: 12px; font-weight: 600; font-size: 15px; }
+    .var-card input.var-name:focus { box-shadow: none; border-bottom-color: var(--primary-container); }
+    .var-card-footer { display: flex; justify-content: space-between; align-items: center; }
+    .var-card-footer select { width: auto; padding: 6px; font-size: 13px; }
+    .code-tag { background: var(--surface-low); color: var(--on-surface-variant); padding: 4px 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 12px; border: 1px solid var(--outline-variant); }
+    .btn-remove-var { position: absolute; top: -10px; right: -10px; color: white; background: var(--error); border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 12px; opacity: 0; transition: opacity 0.2s; box-shadow: var(--shadow-sm); }
+    .var-card:hover .btn-remove-var { opacity: 1; }
+
+    .steps-header { padding: 20px; background: var(--surface); border-bottom: 1px solid var(--outline-variant); display: flex; justify-content: space-between; align-items: center; }
+    .steps-actions button { background: var(--surface-low); border: 1px solid var(--outline-variant); padding: 8px 14px; border-radius: var(--radius-lg); font-size: 13px; font-weight: 600; margin-left: 8px; color: var(--on-surface-variant); }
+    .steps-actions button:hover { background: #e7f5ee; border-color: #a7e3c9; color: var(--primary); }
+    .steps-list { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px; }
+
+    /* Ponto de inserção: escolher onde o novo passo entra */
+    .insert-point { display: flex; align-items: center; justify-content: center; min-height: 16px; cursor: pointer; opacity: 0.3; transition: opacity 0.15s; }
+    .insert-point:hover { opacity: 1; }
+    .insert-point.active { opacity: 1; }
+    .insert-point span { font-size: 11px; font-weight: 600; color: var(--primary); background: #e7f5ee; border: 1px dashed #a7e3c9; border-radius: 999px; padding: 1px 12px; line-height: 18px; }
+    .insert-point.active span { background: var(--primary); color: #fff; border-style: solid; border-color: var(--primary); }
+    .insert-point .line { flex: 1; height: 1px; background: transparent; }
+    .insert-point:hover .line, .insert-point.active .line { background: #a7e3c9; }
+
+    .step-card { background: var(--surface); border: 1px solid var(--outline-variant); border-radius: var(--radius-xl); padding: 16px; display: flex; gap: 20px; align-items: center; box-shadow: var(--shadow-sm); transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s; }
+    .step-card:hover { border-color: var(--outline); box-shadow: var(--shadow-md); }
+    .step-card.dragging { opacity: 0.4; border-style: dashed; border-color: var(--primary-container); }
+    .step-card.drag-over { border-color: var(--primary-container); box-shadow: 0 0 0 2px rgba(0,90,64,0.25); }
+    .step-drag-handle { cursor: grab; color: var(--outline-variant); font-size: 16px; line-height: 1; padding: 2px 4px; user-select: none; text-align: center; }
+    .step-drag-handle:hover { color: var(--outline); }
+    .step-drag-handle:active { cursor: grabbing; }
+    .step-controls { display: flex; flex-direction: column; gap: 4px; }
+    .step-controls button { color: var(--outline); padding: 4px; font-size: 12px; background: var(--surface-low); border-radius: 4px; border: 1px solid transparent; }
+    .step-controls button:hover:not(:disabled) { color: var(--on-surface); border-color: var(--outline-variant); }
+    .step-icon { width: 48px; height: 48px; border-radius: 50%; background: #e7f5ee; border: 1px solid #cdeadd; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; position: relative; }
+    .step-content { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .step-remove { color: var(--outline); padding: 10px; border-radius: var(--radius-lg); background: var(--surface-low); }
+    .step-remove:hover { color: var(--error); background: var(--error-container); }
+
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--outline); }
+
+    /* Simulador (Teste seguro) */
+    .sim-overlay { position: fixed; inset: 0; background: rgba(25,28,30,0.55); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 24px; }
+    .sim-modal { background: var(--surface); border-radius: var(--radius-xl); width: 100%; max-width: 780px; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px -10px rgba(0,0,0,0.4); }
+    .sim-header { background: var(--primary); color: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+    .sim-header h3 { font-size: 18px; font-weight: 700; }
+    .sim-close { color: white; font-size: 20px; opacity: 0.85; }
+    .sim-close:hover { opacity: 1; }
+    .sim-banner { background: #e7f5ee; color: var(--primary); font-size: 13px; padding: 10px 24px; border-bottom: 1px solid #a7e3c9; }
+    .sim-body { display: flex; gap: 16px; padding: 20px; overflow: hidden; flex: 1; min-height: 0; }
+    .sim-steps, .sim-log { flex: 1; overflow-y: auto; border: 1px solid var(--outline-variant); border-radius: var(--radius-lg); padding: 12px; background: var(--surface-bright); min-height: 220px; }
+    .sim-steps h4, .sim-log h4 { font-size: 11px; text-transform: uppercase; color: var(--on-surface-variant); margin-bottom: 10px; letter-spacing: 0.05em; font-weight: 700; }
+    .sim-step-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px; border-radius: 6px; font-size: 13px; color: var(--on-surface-variant); margin-bottom: 4px; border: 1px solid transparent; }
+    .sim-step-row .si { font-size: 16px; flex-shrink: 0; }
+    .sim-step-row.current { background: #e7f5ee; border-color: #a7e3c9; font-weight: 600; color: var(--primary); }
+    .sim-step-row.done { opacity: 0.45; }
+    .sim-log-entry { font-size: 13px; padding: 6px 4px; border-bottom: 1px dashed var(--outline-variant); color: var(--on-surface-variant); display: flex; gap: 8px; align-items: baseline; }
+    .sim-log-entry .lt { font-weight: 600; }
+    .sim-log-entry .ld { color: var(--outline); }
+    .sim-controls { padding: 14px 24px; border-top: 1px solid var(--outline-variant); display: flex; gap: 12px; align-items: center; background: var(--surface); flex-wrap: wrap; }
+    .sim-controls button { padding: 10px 18px; border-radius: var(--radius-lg); font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; color: white; }
+    .sim-controls button:active:not(:disabled) { transform: scale(0.98); }
+    .sim-btn-play { background: var(--primary); }
+    .sim-btn-pause { background: var(--accent); }
+    .sim-btn-stop { background: var(--error); }
+    .sim-controls button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .sim-speed { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--on-surface-variant); }
+    .sim-speed select { width: auto; padding: 6px 10px; margin: 0; }
+  </style>
+</head>
+<body>
+
+  <!-- AVISO DE SEGURANÇA DO FIREFOX -->
+  <div id="storage-warning">
+    ⚠️ Aviso: O Firefox bloqueou o salvamento automático por segurança. Use os botões "Exportar" e "Importar" no canto inferior esquerdo para salvar seus robôs no computador.
+  </div>
+
+  <!-- CABEÇALHO -->
+  <div class="header">
+    <div class="header-title"><span class="material-symbols-outlined fill-icon">robot_2</span> Cresol RPA Web <span style="font-size:11px; font-weight:400; opacity:0.6; margin-left:4px;" id="app-version"></span></div>
+    <div class="nav-buttons">
+      <button id="tab-runner" class="active" onclick="app.switchTab('runner')"><span class="material-symbols-outlined" style="font-size:18px;">play_circle</span> Executar Robôs</button>
+      <button id="tab-creator" onclick="app.switchTab('creator')"><span class="material-symbols-outlined" style="font-size:18px;">edit_square</span> Criar / Editar</button>
+      <button id="tab-settings" onclick="app.switchTab('settings')"><span class="material-symbols-outlined" style="font-size:18px;">settings</span> Configurações</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- ABA: EXECUTAR ROBÔS -->
+    <div id="runner-view">
+      <div class="panel sidebar">
+        <div class="sidebar-header">
+          Meus Robôs
+          <button class="btn-icon" onclick="app.startNewScript()" title="Novo Robô">➕ Novo</button>
+        </div>
+        <div class="script-list" id="script-list"></div>
+        
+        <!-- NOVOS BOTÕES DE BACKUP -->
+        <div class="backup-controls">
+          <button onclick="app.exportBackup()" title="Salva a lista de robôs em um arquivo">📥 Exportar</button>
+          <button onclick="document.getElementById('import-file').click()" title="Carrega robôs de um arquivo salvo">📤 Importar</button>
+          <input type="file" id="import-file" style="display:none" accept=".json" onchange="app.importBackup(event)">
+        </div>
+      </div>
+      <div class="panel main-content" id="runner-content">
+        <!-- Conteúdo injetado via JS -->
+      </div>
+    </div>
+
+    <!-- ABA: CRIAR / EDITAR -->
+    <div id="creator-view" class="panel hidden">
+      <!-- Conteúdo injetado via JS -->
+    </div>
+
+    <!-- ABA: CONFIGURAÇÕES -->
+    <div id="settings-view" class="hidden">
+      <div class="panel sidebar">
+        <div class="sidebar-header">Meus Robôs</div>
+        <div class="script-list" id="settings-script-list"></div>
+      </div>
+      <div class="panel main-content" id="settings-content">
+        <!-- Conteúdo injetado via JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================
+       LÓGICA DO SISTEMA (JAVASCRIPT PURO)
+       ========================================= -->
+  <script>
+    // Captura erros globais para mostrar na tela (facilita debug no GAS)
+    window.onerror = function(msg, src, line, col, err) {
+      console.error('ERRO GLOBAL:', msg, 'em', src, 'linha', line);
+      var box = document.getElementById('storage-warning');
+      if (box) { box.style.display = 'block'; box.textContent = 'Erro JS: ' + msg + ' (linha ' + line + ')'; }
+    };
+
+    window.app = {
+      VERSION: '2.5.0',
+      scripts: [],
+      activeTab: 'runner',
+      selectedScriptId: null,
+      editingScript: null,
+      insertAt: 0,
+      runVariables: {},
+      sim: null,
+      debugMode: false,
+      unattendedMode: false,
+      antiIdle: true,
+      storageEnabled: true,
+      commonKeys: ['Tab', 'Enter', 'Escape', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backspace', 'Delete', 'F12'],
+
+      // =========================================
+      // CAMADA DE ARMAZENAMENTO
+      // Usa a Planilha Google quando servido pelo GAS;
+      // cai para o localStorage quando aberto como arquivo local.
+      // =========================================
+      storage: {
+        isGAS() {
+          return (typeof google !== 'undefined' && google.script && google.script.run);
+        },
+        load(onDone) {
+          if (this.isGAS()) {
+            console.log('[RPA] Carregando robôs da Planilha Google...');
+            google.script.run
+              .withSuccessHandler(function (data) {
+                console.log('[RPA] Planilha respondeu:', Array.isArray(data) ? data.length + ' robôs' : typeof data);
+                onDone(data || [], null);
+              })
+              .withFailureHandler(function (err) {
+                console.error('[RPA] Falha ao ler planilha:', err);
+                onDone(null, err);
+              })
+              .getRobots();
+          } else {
+            var parsed;
+            try {
+              const saved = localStorage.getItem('cresol_rpa_offline_v7');
+              parsed = saved ? JSON.parse(saved) : [];
+            } catch (e) { onDone(null, e); return; }
+            onDone(parsed, null);
+          }
+        },
+        save(scripts, onDone, onError) {
+          if (this.isGAS()) {
+            google.script.run
+              .withSuccessHandler(function () { if (onDone) onDone(); })
+              .withFailureHandler(function (err) { if (onError) onError(err); })
+              .saveAll(scripts);
+          } else {
+            try {
+              localStorage.setItem('cresol_rpa_offline_v7', JSON.stringify(scripts));
+              if (onDone) onDone();
+            } catch (e) { if (onError) onError(e); }
+          }
+        }
+      },
+
+      init() {
+        console.log('[RPA v' + this.VERSION + '] init — modo:', this.storage.isGAS() ? 'Google Apps Script' : 'localStorage');
+        this.render();
+        this.storage.load((data, error) => {
+          try {
+            if (error) {
+              console.error('[RPA] Erro ao carregar:', error);
+              this.storageEnabled = false;
+              const w = document.getElementById('storage-warning');
+              if (w) { w.style.display = 'block'; w.textContent = 'Erro ao carregar robôs: ' + (error.message || error); }
+            } else {
+              var arr = Array.isArray(data) ? data : [];
+              console.log('[RPA] Dados recebidos:', arr.length, 'robôs');
+              this.scripts = arr.map(s => ({ ...s, variables: s.variables || [], steps: s.steps || [] }));
+              if (this.scripts.length > 0) {
+                this.selectedScriptId = this.scripts[0].id;
+                this.initRunVariables();
+              }
+            }
+          } catch(e) {
+            console.error('[RPA] Erro ao processar dados:', e);
+            var w = document.getElementById('storage-warning');
+            if (w) { w.style.display = 'block'; w.textContent = 'Erro ao processar robôs: ' + e.message; }
+          }
+          this.render();
+        });
+      },
+
+      // Salvar (planilha no GAS, ou navegador localmente)
+      save() {
+        if (!this.storageEnabled) return;
+        this.storage.save(this.scripts, null, (error) => {
+          console.warn("Não foi possível salvar.", error);
+        });
+      },
+
+      // =========================================
+      // NOVAS FUNÇÕES: IMPORTAR E EXPORTAR
+      // =========================================
+      exportBackup() {
+        if (this.scripts.length === 0) {
+          alert("Não há robôs para exportar.");
+          return;
+        }
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.scripts));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href",     dataStr);
+        downloadAnchorNode.setAttribute("download", "cresol_robos_backup.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+      },
+
+      importBackup(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const importedRaw = JSON.parse(e.target.result);
+            if (Array.isArray(importedRaw)) {
+              const importedScripts = importedRaw.map(s => ({ ...s, variables: s.variables || [], steps: s.steps || [] }));
+              // Pergunta se quer substituir ou adicionar
+              if (this.scripts.length > 0) {
+                if (confirm("Deseja substituir os robôs atuais pelos importados? (Clique em OK para substituir, ou Cancelar para apenas adicionar à lista existente)")) {
+                  this.scripts = importedScripts;
+                } else {
+                  this.scripts = [...this.scripts, ...importedScripts];
+                }
+              } else {
+                this.scripts = importedScripts;
+              }
+              
+              this.save();
+              if (this.scripts.length > 0) {
+                this.selectedScriptId = this.scripts[0].id;
+                this.initRunVariables();
+              }
+              this.render();
+              alert("Robôs importados com sucesso!");
+            } else {
+              alert("Arquivo inválido.");
+            }
+          } catch (error) {
+            alert("Erro ao ler o arquivo. Certifique-se de que é um arquivo .json válido.");
+          }
+        };
+        reader.readAsText(file);
+        // Limpa o input para permitir importar o mesmo arquivo novamente se necessário
+        event.target.value = '';
+      },
+
+      generateId() {
+        return Math.random().toString(36).substr(2, 9);
+      },
+
+      switchTab(tab) {
+        if (tab === 'creator' && !this.editingScript) {
+          this.startNewScript();
+          return;
+        }
+        this.activeTab = tab;
+        this.render();
+      },
+
+      startNewScript() {
+        this.editingScript = { id: this.generateId(), name: 'Novo Robô', description: '', variables: [], steps: [] };
+        this.insertAt = 0;
+        this.activeTab = 'creator';
+        this.render();
+      },
+
+      editScript(id) {
+        const script = this.scripts.find(s => s.id === id);
+        if (script) {
+          this.editingScript = JSON.parse(JSON.stringify(script));
+          this.insertAt = 0;
+          this.activeTab = 'creator';
+          this.render();
+        }
+      },
+
+      deleteScript(id) {
+        if (confirm('Tem certeza que deseja excluir este robô?')) {
+          this.scripts = this.scripts.filter(s => s.id !== id);
+          if (this.selectedScriptId === id) {
+            this.selectedScriptId = this.scripts.length > 0 ? this.scripts[0].id : null;
+            this.initRunVariables();
+          }
+          this.save();
+          this.render();
+        }
+      },
+
+      selectScript(id) {
+        this.selectedScriptId = id;
+        this.initRunVariables();
+        this.render();
+      },
+
+      saveEditingScript() {
+        if (!this.editingScript) return;
+        const index = this.scripts.findIndex(s => s.id === this.editingScript.id);
+        if (index >= 0) {
+          this.scripts[index] = this.editingScript;
+        } else {
+          this.scripts.push(this.editingScript);
+        }
+        this.selectedScriptId = this.editingScript.id;
+        this.editingScript = null;
+        this.activeTab = 'runner';
+        this.save();
+        this.initRunVariables();
+        this.render();
+      },
+
+      cancelEdit() {
+        this.editingScript = null;
+        this.activeTab = 'runner';
+        this.render();
+      },
+
+      // Inicializa as variáveis de execução calculando datas automáticas
+      initRunVariables() {
+        const script = this.scripts.find(s => s.id === this.selectedScriptId);
+        if (!script) return;
+        
+        this.runVariables = {};
+        (script.variables || []).forEach(v => {
+          if (v.type === 'date_calc') {
+            const offset = parseInt(v.defaultValue) || 0;
+            const d = new Date();
+            d.setDate(d.getDate() + offset);
+            // Formata para YYYY-MM-DD para o input type="date"
+            this.runVariables[v.id] = d.toISOString().split('T')[0];
+          } else {
+            this.runVariables[v.id] = '';
+          }
+        });
+      },
+
+      // Funções de Variáveis
+      addVariable() {
+        this.editingScript.variables.push({ id: 'VAR_' + this.generateId().toUpperCase(), name: 'Nova Variável', type: 'text', defaultValue: '0' });
+        this.renderCreator();
+      },
+      removeVariable(id) {
+        this.editingScript.variables = this.editingScript.variables.filter(v => v.id !== id);
+        this.renderCreator();
+      },
+      updateVariable(id, field, value) {
+        const v = this.editingScript.variables.find(x => x.id === id);
+        if (v) v[field] = value;
+        if (field === 'type') this.renderCreator();
+      },
+
+      // Funções de Loop
+      toggleLoop() {
+        if (!this.editingScript.loop) {
+          this.editingScript.loop = { enabled: true, count: 2 };
+        } else {
+          this.editingScript.loop.enabled = !this.editingScript.loop.enabled;
+        }
+        this.renderCreator();
+      },
+      updateLoopCount(count) {
+        if (this.editingScript.loop) {
+          this.editingScript.loop.count = parseInt(count) || 1;
+        }
+      },
+
+      // Funções de Passos
+      addStep(type) {
+        // Adiciona o novo passo na posição selecionada pelo usuário
+        const defaults = { wait:'1000', key:'Tab', combo:'Tab', run:'calc.exe', site:'https://www.cresol.com.br', focus:'Mozilla Firefox', anchor:'1', totp:'' };
+        const step = { id: this.generateId(), type, value: defaults[type] || '', description:'' };
+        if (type === 'combo') { step.ctrl = false; step.alt = true; step.shift = false; } // começa como Alt+Tab
+        // Insere no ponto escolhido pelo usuário (padrão: topo). Avança o ponto para manter a ordem.
+        const pos = Math.min(Math.max(0, this.insertAt || 0), this.editingScript.steps.length);
+        this.editingScript.steps.splice(pos, 0, step);
+        this.insertAt = pos + 1;
+        this.renderCreator();
+      },
+      setInsertAt(pos) {
+        this.insertAt = pos;
+        this.renderCreator();
+      },
+      removeStep(id) {
+        this.editingScript.steps = this.editingScript.steps.filter(s => s.id !== id);
+        this.renderCreator();
+      },
+      duplicateStep(id) {
+        const index = this.editingScript.steps.findIndex(s => s.id === id);
+        if (index < 0) return;
+        const copy = JSON.parse(JSON.stringify(this.editingScript.steps[index]));
+        copy.id = this.generateId();
+        // Insere a cópia logo abaixo do original na lista
+        this.editingScript.steps.splice(index + 1, 0, copy);
+        this.renderCreator();
+      },
+      updateStep(id, field, value) {
+        const s = this.editingScript.steps.find(x => x.id === id);
+        if (s) s[field] = value;
+        // Re-renderiza só quando muda algo que afeta o layout/prévia (não ao digitar descrição/pausa).
+        if (field === 'type' || (field === 'value' && s.type === 'key') || (s.type === 'combo' && field !== 'description' && field !== 'pause')) this.renderCreator();
+      },
+      moveStep(index, dir) {
+        // dir: -1 (sobe na tela, vai para índice menor), 1 (desce na tela, vai para índice maior)
+        const newIndex = index + dir;
+        if (newIndex >= 0 && newIndex < this.editingScript.steps.length) {
+          const temp = this.editingScript.steps[index];
+          this.editingScript.steps[index] = this.editingScript.steps[newIndex];
+          this.editingScript.steps[newIndex] = temp;
+          this.renderCreator();
+        }
+      },
+
+      // Arrastar e soltar passos
+      draggedStepIndex: null,
+      dragStart(event, index) {
+        this.draggedStepIndex = index;
+        event.dataTransfer.effectAllowed = 'move';
+        // Necessário no Firefox para o arraste funcionar
+        try { event.dataTransfer.setData('text/plain', String(index)); } catch (e) {}
+        event.currentTarget.classList.add('dragging');
+      },
+      dragOver(event, index) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        const card = event.currentTarget;
+        if (!card.classList.contains('dragging')) card.classList.add('drag-over');
+      },
+      dragLeave(event) {
+        event.currentTarget.classList.remove('drag-over');
+      },
+      dropStep(event, toIndex) {
+        event.preventDefault();
+        const fromIndex = this.draggedStepIndex;
+        if (fromIndex === null || fromIndex === toIndex) {
+          this.dragEnd(event);
+          return;
+        }
+        const steps = this.editingScript.steps;
+        const [moved] = steps.splice(fromIndex, 1);
+        steps.splice(toIndex, 0, moved);
+        this.draggedStepIndex = null;
+        this.renderCreator();
+      },
+      dragEnd(event) {
+        this.draggedStepIndex = null;
+        document.querySelectorAll('.step-card').forEach(c => c.classList.remove('dragging', 'drag-over'));
+      },
+
+      // Escapar caracteres para VBScript
+      escapeVBSText(text) {
+        let escaped = text.replace(/"/g, '""');
+        escaped = escaped.replace(/([+^%~()[\]{}])/g, '{$1}');
+        return escaped;
+      },
+      escapeVBSKey(key) {
+        const keyMap = {
+          'Tab': '{TAB}', 'Enter': '{ENTER}', 'Escape': '{ESC}', 'Space': ' ',
+          'ArrowUp': '{UP}', 'ArrowDown': '{DOWN}', 'ArrowLeft': '{LEFT}', 'ArrowRight': '{RIGHT}',
+          'Backspace': '{BACKSPACE}', 'Delete': '{DEL}'
+        };
+        return keyMap[key] || `{${key}}`;
+      },
+      // Combinação de teclas (ex.: Alt+Tab): texto amigável para a tela.
+      comboPreview(step) {
+        const parts = [];
+        if (step.ctrl) parts.push('Ctrl');
+        if (step.alt) parts.push('Alt');
+        if (step.shift) parts.push('Shift');
+        parts.push(step.value || '?');
+        return parts.join(' + ');
+      },
+      // Combinação de teclas: monta a string do SendKeys (^ = Ctrl, % = Alt, + = Shift).
+      comboSendKeys(step) {
+        let mod = '';
+        if (step.ctrl) mod += '^';
+        if (step.alt) mod += '%';
+        if (step.shift) mod += '+';
+        return mod + this.escapeVBSKey(step.value);
+      },
+      // Escapa texto para ficar dentro de "aspas" numa string literal do VBScript (log)
+      escapeVBSString(text) {
+        return (text || '').replace(/"/g, '""').replace(/\r?\n/g, ' ');
+      },
+      // Pausas padrão (ms) após cada tipo de ação
+      defaultPause(type) {
+        return type === 'site' ? 6000 : type === 'run' ? 1000 : type === 'totp' ? 1000 : type === 'type' ? 500 : 300;
+      },
+      // Pausa efetiva de um passo: usa a definida pelo usuário, senão o padrão do tipo
+      stepPause(step) {
+        const p = parseInt(step.pause);
+        return (!isNaN(p) && p >= 0) ? p : this.defaultPause(step.type);
+      },
+      // Conversões de unidade: a tela trabalha em SEGUNDOS, o VBScript em milissegundos.
+      // Internamente guardamos ms; aqui só traduzimos para mostrar/editar.
+      msToSec(ms) {
+        const n = parseInt(ms);
+        if (isNaN(n)) return '';
+        return +(n / 1000).toFixed(3); // remove zeros à direita: 300 -> 0.3, 1500 -> 1.5, 900000 -> 900
+      },
+      // Recebe o valor em segundos digitado na tela e guarda em milissegundos.
+      updateStepSeconds(id, field, secValue) {
+        const n = parseFloat(secValue);
+        const ms = (!isNaN(n) && n >= 0) ? String(Math.round(n * 1000)) : '';
+        this.updateStep(id, field, ms);
+      },
+      // Dica amigável: mostra o equivalente em minutos quando a espera é longa.
+      secHint(ms) {
+        const n = parseInt(ms);
+        if (isNaN(n) || n < 60000) return '';
+        const min = +(n / 60000).toFixed(1);
+        return ` (= ${min} min)`;
+      },
+
+      // Atualizar Variável de Execução
+      updateRunVar(id, value) {
+        this.runVariables[id] = value;
+      },
+
+      // Baixar VBS
+      downloadVBS(id) {
+        const script = this.scripts.find(s => s.id === id);
+        if (!script) return;
+        const debug = this.debugMode;
+
+        let vbs = `' ==========================================\n`;
+        vbs += `' Robô: ${script.name}\n`;
+        vbs += `' Descrição: ${script.description}\n`;
+        vbs += `' Gerado pelo Cresol RPA Web\n`;
+        vbs += `' ==========================================\n\n`;
+        vbs += `Set WshShell = WScript.CreateObject("WScript.Shell")\n`;
+
+        // --- Anti-ocioso: pausa "ativa" que mantém a máquina acordada SEM atrapalhar o robô ---
+        // Em vez de um Sleep grande (que deixa a máquina ociosa e a leva ao bloqueio), dividimos a
+        // espera em fatias e, ENTRE elas, enviamos {F15} — uma tecla neutra que não digita nada e
+        // não rouba o foco. Como isso só acontece DENTRO das pausas (nunca enquanto o robô digita),
+        // não há colisão com a digitação do robô.
+        const antiIdle = this.antiIdle;
+        const sleepCmd = antiIdle ? 'SleepAtivo' : 'WScript.Sleep';
+        if (antiIdle) {
+          vbs += `\n' --- Anti-ocioso (mantém a máquina ativa durante as pausas) ---\n`;
+          vbs += `Sub SleepAtivo(ms)\n`;
+          vbs += `  Dim restante, fatia\n`;
+          vbs += `  restante = ms\n`;
+          vbs += `  Do While restante > 0\n`;
+          vbs += `    fatia = restante\n`;
+          vbs += `    If fatia > 50000 Then fatia = 50000 ' fatia máxima de 50s\n`;
+          vbs += `    WScript.Sleep fatia\n`;
+          vbs += `    restante = restante - fatia\n`;
+          vbs += `    If restante > 0 Then WshShell.SendKeys "{F15}" ' tecla neutra: só evita ociosidade\n`;
+          vbs += `  Loop\n`;
+          vbs += `End Sub\n`;
+        }
+
+        // Declarações globais para os passos "site" e "focar" (uma só vez, evita Dim duplicado)
+        const hasSite = script.steps.some(s => s.type === 'site' || s.type === 'focus');
+        if (hasSite) {
+          vbs += `Dim ffFso, ff64, ff32, fxAtiv, fxTry\n`;
+          vbs += `Set ffFso = CreateObject("Scripting.FileSystemObject")\n`;
+          vbs += `ff64 = "C:\\Program Files\\Mozilla Firefox\\firefox.exe"\n`;
+          vbs += `ff32 = "C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe"\n`;
+        }
+
+        const hasTotp = script.steps.some(s => s.type === 'totp');
+        if (hasTotp) {
+          vbs += `Dim totpCmd, totpExec, totpCode\n`;
+        }
+
+        // --- Modo Depuração: log em arquivo + narração em voz ---
+        if (debug) {
+          vbs += `\n' --- Modo Depuração ---\n`;
+          vbs += `Dim dbgFso, dbgLog, dbgPath, dbgVoice, dbgStep\n`;
+          vbs += `Set dbgFso = CreateObject("Scripting.FileSystemObject")\n`;
+          vbs += `dbgPath = WshShell.SpecialFolders("Desktop") & "\\log_robo_${script.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt"\n`;
+          vbs += `Set dbgLog = dbgFso.CreateTextFile(dbgPath, True)\n`;
+          vbs += `dbgStep = 0\n`;
+          vbs += `On Error Resume Next\n`;
+          vbs += `Set dbgVoice = CreateObject("SAPI.SpVoice")\n`;
+          vbs += `On Error GoTo 0\n`;
+          vbs += `dbgLog.WriteLine Now & " - INICIO do robo: ${this.escapeVBSString(script.name)}"\n`;
+        }
+        vbs += `\n`;
+
+        // Declarar e inicializar variáveis no VBScript
+        const scriptVars = script.variables || [];
+        if (scriptVars.length > 0) {
+          vbs += `' --- Inicialização de Variáveis ---\n`;
+          scriptVars.forEach(v => {
+            vbs += `Dim ${v.id}\n`;
+            if (v.type === 'date_calc') {
+              const offset = parseInt(v.defaultValue) || 0;
+              // VBScript para calcular a data dinamicamente no momento da execução
+              vbs += `${v.id} = Right("0" & Day(DateAdd("d", ${offset}, Date())), 2) & "/" & Right("0" & Month(DateAdd("d", ${offset}, Date())), 2) & "/" & Year(DateAdd("d", ${offset}, Date()))\n`;
+            } else {
+              // Para texto e data manual, pega o valor que o usuário digitou na tela de execução
+              let val = this.runVariables[v.id] || '';
+              if (v.type === 'date' && val) {
+                const parts = val.split('-');
+                if (parts.length === 3) val = `${parts[2]}/${parts[1]}/${parts[0]}`;
+              }
+              vbs += `${v.id} = "${this.escapeVBSText(val)}"\n`;
+            }
+            if (debug) vbs += `dbgLog.WriteLine "   Variavel ${v.id} = " & ${v.id}\n`;
+          });
+          vbs += `' ----------------------------------\n\n`;
+        }
+
+        if (this.unattendedMode) {
+          // Modo desassistido: aviso some sozinho em 3s, não espera clique (ideal para agendamento)
+          vbs += `' Modo desassistido: contagem automática, sem precisar clicar\n`;
+          vbs += `WshShell.Popup "O robô vai começar em 3 segundos...", 3, "Cresol RPA", 64\n\n`;
+        } else {
+          vbs += `MsgBox "O robô vai começar em 3 segundos. Clique na tela do sistema agora!", 64, "Aviso"\n`;
+          vbs += `WScript.Sleep 3000\n\n`;
+        }
+
+        const stepsToExecute = [...script.steps];
+
+        // Em depuração, segue mesmo se um passo falhar, para registrar o erro no log
+        if (debug) vbs += `On Error Resume Next\n`;
+
+        // Lógica de Loop
+        const hasLoop = script.loop && script.loop.enabled;
+        if (hasLoop) {
+          vbs += `Dim loopCount\n`;
+          vbs += `For loopCount = 1 To ${script.loop.count}\n`;
+          vbs += `  ' --- Início da Repetição (Ciclo ' & loopCount & ') ---\n`;
+          if (debug) {
+            vbs += `  dbgStep = 0\n`;
+            vbs += `  dbgLog.WriteLine Now & " - === Ciclo " & loopCount & " ==="\n`;
+          }
+        }
+
+        stepsToExecute.forEach(step => {
+          let indent = hasLoop ? '  ' : '';
+
+          // Registro/narração antes de executar o passo (não rouba o foco da tela)
+          if (debug) {
+            const d = this.describeStep(step, script);
+            const label = this.escapeVBSString(`${d.title}: ${d.detail}`);
+            vbs += `${indent}dbgStep = dbgStep + 1\n`;
+            vbs += `${indent}dbgLog.WriteLine Now & " - PASSO " & dbgStep & ": ${label}"\n`;
+            vbs += `${indent}If Not (dbgVoice Is Nothing) Then dbgVoice.Speak "Passo " & dbgStep, 1\n`;
+          }
+
+          if (step.type === 'wait') {
+            vbs += `${indent}${sleepCmd} ${step.value} ' ${step.description}\n`;
+          } else if (step.type === 'key') {
+            vbs += `${indent}WshShell.SendKeys "${this.escapeVBSKey(step.value)}" ' ${step.description}\n`;
+            vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
+          } else if (step.type === 'combo') {
+            vbs += `${indent}WshShell.SendKeys "${this.comboSendKeys(step)}" ' ${step.description} (${this.comboPreview(step)})\n`;
+            vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
+          } else if (step.type === 'run') {
+            vbs += `${indent}WshShell.Run "${step.value.replace(/"/g, '""')}" ' ${step.description}\n`;
+            vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
+          } else if (step.type === 'site') {
+            // Abre o endereço no Firefox com perfil RoboRPA (caminhos declarados no topo). Se não existir, usa o navegador padrão.
+            const url = (step.value || '').replace(/"/g, '""');
+            vbs += `${indent}If ffFso.FileExists(ff64) Then ' ${step.description}\n`;
+            vbs += `${indent}  WshShell.Run """" & ff64 & """ -P ""RoboRPA"" -new-window ""${url}"""\n`;
+            vbs += `${indent}ElseIf ffFso.FileExists(ff32) Then\n`;
+            vbs += `${indent}  WshShell.Run """" & ff32 & """ -P ""RoboRPA"" -new-window ""${url}"""\n`;
+            vbs += `${indent}Else\n`;
+            vbs += `${indent}  WshShell.Run """${url}"""\n`;
+            vbs += `${indent}End If\n`;
+            // Traz o Firefox para a frente (foco da tela) — tenta algumas vezes enquanto a janela abre.
+            vbs += `${indent}If ffFso.FileExists(ff64) Or ffFso.FileExists(ff32) Then\n`;
+            vbs += `${indent}  For fxTry = 1 To 10\n`;
+            vbs += `${indent}    fxAtiv = WshShell.AppActivate("Mozilla Firefox")\n`;
+            vbs += `${indent}    If fxAtiv Then Exit For\n`;
+            vbs += `${indent}    WScript.Sleep 400\n`;
+            vbs += `${indent}  Next\n`;
+            vbs += `${indent}End If\n`;
+            vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
+          } else if (step.type === 'focus') {
+            // Traz o Firefox (ou a janela informada) para a frente, sem abrir nada novo.
+            const win = (step.value || 'Mozilla Firefox').replace(/"/g, '""');
+            vbs += `${indent}For fxTry = 1 To 10 ' ${step.description}\n`;
+            vbs += `${indent}  fxAtiv = WshShell.AppActivate("${win}")\n`;
+            vbs += `${indent}  If fxAtiv Then Exit For\n`;
+            vbs += `${indent}  WScript.Sleep 400\n`;
+            vbs += `${indent}Next\n`;
+            vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
+          } else if (step.type === 'anchor') {
+            // Inicio padrao: foca a barra de endereco (Ctrl+L, sempre o mesmo ponto)
+            // e entra na pagina com um numero FIXO de Tabs, garantindo origem identica a cada execucao.
+            const tabs = Math.max(0, parseInt(step.value) || 0);
+            vbs += `${indent}WshShell.SendKeys "^l" ' ${step.description} (Ctrl+L: foca a barra de endereco)\n`;
+            vbs += `${indent}WScript.Sleep 400\n`;
+            if (tabs > 0) {
+              vbs += `${indent}WshShell.SendKeys "{TAB ${tabs}}" ' entra na pagina (${tabs} Tab fixo)\n`;
+            }
+            vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
+          } else if (step.type === 'totp') {
+            const secret = (step.value || '').replace(/"/g, '""').replace(/\s/g, '').toUpperCase();
+            vbs += `${indent}' ${step.description || 'Gerar e digitar código TOTP'}\n`;
+            vbs += `${indent}totpCmd = "powershell -NoProfile -ExecutionPolicy Bypass -Command """ & _\n`;
+            vbs += `${indent}  "$b32 = '${secret}'; " & _\n`;
+            vbs += `${indent}  "$map = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; " & _\n`;
+            vbs += `${indent}  "$bits = ''; foreach ($c in $b32.ToCharArray()) { $i = $map.IndexOf([char]::ToUpper($c)); if ($i -ge 0) { $bits += [Convert]::ToString($i, 2).PadLeft(5, '0') } }; " & _\n`;
+            vbs += `${indent}  "$bytes = New-Object System.Collections.Generic.List[byte]; for ($i = 0; $i + 8 -le $bits.Length; $i += 8) { $bytes.Add([Convert]::ToByte($bits.Substring($i, 8), 2)) }; " & _\n`;
+            vbs += `${indent}  "$key = $bytes.ToArray(); " & _\n`;
+            vbs += `${indent}  "$epoch = [math]::Floor(([DateTimeOffset]::UtcNow.ToUnixTimeSeconds()) / 30); " & _\n`;
+            vbs += `${indent}  "$tb = [BitConverter]::GetBytes([int64]$epoch); [Array]::Reverse($tb); " & _\n`;
+            vbs += `${indent}  "$hmac = New-Object System.Security.Cryptography.HMACSHA1(,$key); $hash = $hmac.ComputeHash($tb); " & _\n`;
+            vbs += `${indent}  "$off = $hash[$hash.Length - 1] -band 0x0F; " & _\n`;
+            vbs += `${indent}  "$code = (($hash[$off] -band 0x7F) -shl 24) -bor (($hash[$off+1] -band 0xFF) -shl 16) -bor (($hash[$off+2] -band 0xFF) -shl 8) -bor ($hash[$off+3] -band 0xFF); " & _\n`;
+            vbs += `${indent}  "Write-Host (($code % 1000000).ToString('D6'))" & _\n`;
+            vbs += `${indent}  """"\n`;
+            vbs += `${indent}Set totpExec = CreateObject("WScript.Shell").Exec(totpCmd)\n`;
+            vbs += `${indent}totpCode = Trim(totpExec.StdOut.ReadLine())\n`;
+            vbs += `${indent}WshShell.SendKeys totpCode\n`;
+            vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
+          } else if (step.type === 'type') {
+            let text = step.value;
+
+            // Injetar variáveis dinamicamente no VBScript
+            let parts = text.split(/\{\{([^}]+)\}\}/);
+            let vbsParts = [];
+            for (let i = 0; i < parts.length; i++) {
+              if (i % 2 === 0) {
+                if (parts[i] !== '') {
+                  vbsParts.push('"' + this.escapeVBSText(parts[i]) + '"');
+                }
+              } else {
+                const varId = parts[i];
+                if ((script.variables || []).some(v => v.id === varId)) {
+                  vbsParts.push(varId);
+                } else {
+                  vbsParts.push('"' + this.escapeVBSText('{{' + varId + '}}') + '"');
+                }
+              }
+            }
+            if (vbsParts.length === 0) vbsParts.push('""');
+
+            vbs += `${indent}WshShell.SendKeys ${vbsParts.join(' & ')} ' ${step.description}\n`;
+            vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
+          }
+
+          // Registra erro do passo, se houver
+          if (debug) {
+            vbs += `${indent}If Err.Number <> 0 Then dbgLog.WriteLine "   >> ERRO no passo " & dbgStep & ": " & Err.Description : Err.Clear\n`;
+          }
+        });
+
+        if (hasLoop) {
+          vbs += `Next\n`;
+        }
+
+        if (debug) {
+          vbs += `On Error GoTo 0\n`;
+          vbs += `dbgLog.WriteLine Now & " - FIM do robo"\n`;
+          vbs += `dbgLog.Close\n`;
+          vbs += `WshShell.Run "notepad.exe """ & dbgPath & """", 1, False\n`;
+        }
+
+        if (this.unattendedMode) {
+          vbs += `\nWshShell.Popup "Robô finalizado com sucesso!", 3, "Cresol RPA", 64`;
+        } else {
+          vbs += `\nMsgBox "Robô finalizado com sucesso!", 64, "Aviso"`;
+        }
+
+        const blob = new Blob([vbs], { type: 'text/vbs;charset=windows-1252' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${script.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.vbs`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+
+      // =========================================
+      // AGENDADOR (Windows Task Scheduler via .bat)
+      // =========================================
+      safeFileName(name) {
+        return name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      },
+      scheduleExtraHtml(freq) {
+        if (freq === 'ONCE') {
+          const today = new Date().toISOString().split('T')[0];
+          return `<div class="form-group" style="margin:0;"><label>Data</label><input type="date" id="sch-date" value="${today}"></div>`;
+        }
+        if (freq === 'WEEKLY') {
+          const days = [['MON','Seg'],['TUE','Ter'],['WED','Qua'],['THU','Qui'],['FRI','Sex'],['SAT','Sáb'],['SUN','Dom']];
+          const uteis = ['MON','TUE','WED','THU','FRI'];
+          return `<div class="form-group" style="margin:0;"><label>Dias da semana (marque um ou mais)</label>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+              ${days.map(([v,l]) => `<label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer; width:auto; padding:6px 10px; border:1px solid var(--outline-variant); border-radius:8px; background:var(--surface);">
+                <input type="checkbox" class="sch-weekday" value="${v}" style="width:auto;" ${uteis.includes(v)?'checked':''}> ${l}</label>`).join('')}
+            </div></div>`;
+        }
+        if (freq === 'WEEKDAYS') {
+          return `<div style="font-size:13px; color:var(--on-surface-variant); padding-bottom:10px;">Vai rodar de <strong>segunda a sexta</strong> no horário escolhido (pula sábado e domingo).</div>`;
+        }
+        if (freq === 'MONTHLY') {
+          return `<div class="form-group" style="margin:0;"><label>Dia do mês</label>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <input type="number" id="sch-monthday" min="1" max="31" value="1" style="width:80px;">
+              <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer; width:auto;">
+                <input type="checkbox" id="sch-lastday" style="width:auto;" onchange="document.getElementById('sch-monthday').disabled=this.checked"> Último dia do mês
+              </label>
+            </div>
+            <span style="display:block; margin-top:6px; font-size:12px; color:var(--on-surface-variant);">Dias 29–31 podem pular meses curtos (ex.: fevereiro). Para fechamento, marque <strong>Último dia do mês</strong>.</span>
+          </div>`;
+        }
+        return `<div style="font-size:13px; color:var(--on-surface-variant); padding-bottom:10px;">Vai rodar todos os dias no horário escolhido.</div>`;
+      },
+      renderScheduleFields() {
+        const freq = document.getElementById('sch-freq').value;
+        document.getElementById('sch-extra').innerHTML = this.scheduleExtraHtml(freq);
+      },
+      // Converte AAAA-MM-DD para DD/MM/AAAA (formato esperado pelo schtasks em pt-BR)
+      isoToBrDate(iso) {
+        const p = (iso || '').split('-');
+        return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
+      },
+      downloadBat(fileName, content) {
+        const blob = new Blob([content.replace(/\n/g, '\r\n')], { type: 'application/bat;charset=windows-1252' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      // Anti-ocioso AVULSO: roda sozinho e mantém a máquina ativa por X horas.
+      // Útil para deixar o PC acordado até a hora de um robô agendado.
+      downloadAntiIdle() {
+        let vbs = `' ==========================================\n`;
+        vbs += `' Anti-ocioso avulso - Cresol RPA\n`;
+        vbs += `' Mantem o computador ATIVO (evita bloqueio por inatividade).\n`;
+        vbs += `' Envia a tecla neutra F15 de tempos em tempos: NAO digita nada,\n`;
+        vbs += `' nao muda o foco. Para sozinho ao fim do tempo escolhido.\n`;
+        vbs += `' ==========================================\n`;
+        vbs += `Option Explicit\n`;
+        vbs += `Dim WshShell, resp, horas, intervaloSeg, fimEm\n`;
+        vbs += `Set WshShell = CreateObject("WScript.Shell")\n\n`;
+        vbs += `' Pergunta por quantas horas manter o computador ativo (padrao 12)\n`;
+        vbs += `resp = InputBox("Por quantas HORAS manter o computador ativo?" & vbCrLf & vbCrLf & _\n`;
+        vbs += `  "Ex.: para deixar a noite toda ate o robo rodar de manha, use 12 ou 14." & vbCrLf & _\n`;
+        vbs += `  "O anti-ocioso para sozinho ao fim do tempo.", "Anti-ocioso - Cresol RPA", "12")\n\n`;
+        vbs += `If resp = "" Then WScript.Quit ' usuario cancelou\n`;
+        vbs += `If Not IsNumeric(resp) Then resp = "12"\n`;
+        vbs += `horas = CDbl(resp)\n`;
+        vbs += `If horas <= 0 Then horas = 12\n\n`;
+        vbs += `intervaloSeg = 50 ' envia F15 a cada 50 segundos\n`;
+        vbs += `fimEm = DateAdd("h", horas, Now)\n\n`;
+        vbs += `WshShell.Popup "Anti-ocioso LIGADO ate " & FormatDateTime(fimEm) & "." & vbCrLf & _\n`;
+        vbs += `  "Pode minimizar esta janela. Para parar antes, encerre 'wscript.exe'" & vbCrLf & _\n`;
+        vbs += `  "no Gerenciador de Tarefas.", 8, "Anti-ocioso - Cresol RPA", 64\n\n`;
+        vbs += `Do While Now < fimEm\n`;
+        vbs += `  WScript.Sleep intervaloSeg * 1000\n`;
+        vbs += `  WshShell.SendKeys "{F15}" ' tecla neutra: so evita a ociosidade\n`;
+        vbs += `Loop\n\n`;
+        vbs += `WshShell.Popup "Anti-ocioso finalizado. O computador volta ao normal.", 6, "Anti-ocioso - Cresol RPA", 64\n`;
+
+        const blob = new Blob([vbs], { type: 'text/vbs;charset=windows-1252' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'anti_ocioso.vbs';
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      // Diagnóstico: .bat que reúne os eventos do Windows que explicam um desligamento/suspensão.
+      downloadDiagnostic() {
+        let bat = `@echo off\r\n`;
+        bat += `chcp 1252 >nul\r\n`;
+        bat += `title Diagnostico de desligamento - Cresol RPA\r\n`;
+        bat += `net session >nul 2>&1\r\n`;
+        bat += `if %errorlevel% neq 0 (\r\n`;
+        bat += `  echo.\r\n`;
+        bat += `  echo   ATENCAO: para o relatorio ficar COMPLETO, feche e rode de novo\r\n`;
+        bat += `  echo   com botao direito ^> Executar como administrador.\r\n`;
+        bat += `  echo.\r\n`;
+        bat += `  pause\r\n`;
+        bat += `)\r\n`;
+        bat += `set "OUT=%USERPROFILE%\\Desktop\\diagnostico_desligamento.txt"\r\n`;
+        bat += `echo Coletando informacoes do Windows... aguarde alguns segundos.\r\n`;
+        bat += `echo ===== DIAGNOSTICO DE DESLIGAMENTO / SUSPENSAO ===== > "%OUT%"\r\n`;
+        bat += `echo Gerado em: %date% %time% >> "%OUT%"\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        bat += `echo Guia rapido dos codigos (Id):>> "%OUT%"\r\n`;
+        bat += `echo   1074 = quem MANDOU desligar/reiniciar (Windows Update aparece aqui)>> "%OUT%"\r\n`;
+        bat += `echo   109  = transicao de energia do kernel (mostra o Motivo: ex. Kernel API)>> "%OUT%"\r\n`;
+        bat += `echo   6006 = desligamento normal  ^|  6008 = desligamento INESPERADO (queda de energia)>> "%OUT%"\r\n`;
+        bat += `echo   41   = reiniciou sem desligar direito (falta de energia/travamento)>> "%OUT%"\r\n`;
+        bat += `echo   42   = entrou em SUSPENSAO  ^|  107 = acordou  ^|  12 = PC ligou  ^|  13 = PC desligou>> "%OUT%"\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        bat += `echo ----- EVENTOS DE ENERGIA/DESLIGAMENTO (ultimas 60 horas) ----- >> "%OUT%"\r\n`;
+        bat += `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-WinEvent -FilterHashtable @{LogName='System'; StartTime=(Get-Date).AddHours(-60); Id=12,13,41,42,107,109,1074,1076,6005,6006,6008} | Sort-Object TimeCreated | Format-List TimeCreated,Id,ProviderName,Message" >> "%OUT%" 2>&1\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        bat += `echo ----- TAREFAS AGENDADAS QUE EXECUTAM 'shutdown' ----- >> "%OUT%"\r\n`;
+        bat += `echo (se aparecer alguma linha aqui, e uma tarefa que desliga o PC)>> "%OUT%"\r\n`;
+        bat += `schtasks /query /v /fo LIST 2>nul | findstr /i "shutdown" >> "%OUT%" 2>&1\r\n`;
+        bat += `echo --- fim da busca por tarefas de shutdown --- >> "%OUT%"\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        bat += `echo ----- ULTIMO MOTIVO DE DESPERTAR ----- >> "%OUT%"\r\n`;
+        bat += `powercfg /lastwake >> "%OUT%" 2>&1\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        bat += `echo ----- TIMERS QUE PODEM ACORDAR/LIGAR O PC ----- >> "%OUT%"\r\n`;
+        bat += `powercfg /waketimers >> "%OUT%" 2>&1\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        bat += `echo ----- PLANO DE ENERGIA ATIVO ----- >> "%OUT%"\r\n`;
+        bat += `powercfg /getactivescheme >> "%OUT%" 2>&1\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        bat += `echo Pronto^! Abrindo o relatorio...\r\n`;
+        bat += `start notepad "%OUT%"\r\n`;
+
+        const blob = new Blob([bat], { type: 'application/bat;charset=windows-1252' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'diagnostico_desligamento.bat';
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      // Parada de emergência: .bat que encerra na hora qualquer robô/anti-ocioso (wscript.exe).
+      downloadStopper() {        let bat = `@echo off\r\n`;
+        bat += `chcp 1252 >nul\r\n`;
+        bat += `title Parar robo - Cresol RPA\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo   Encerrando robos e anti-ocioso em execucao...\r\n`;
+        bat += `echo.\r\n`;
+        bat += `taskkill /F /IM wscript.exe >nul 2>&1\r\n`;
+        bat += `if %errorlevel%==0 (\r\n`;
+        bat += `  echo   Pronto^! Robo e anti-ocioso foram parados.\r\n`;
+        bat += `) else (\r\n`;
+        bat += `  echo   Nada estava em execucao ^(nenhum robo/anti-ocioso rodando^).\r\n`;
+        bat += `)\r\n`;
+        bat += `echo.\r\n`;
+        bat += `timeout /t 4 >nul\r\n`;
+
+        const blob = new Blob([bat], { type: 'application/bat;charset=windows-1252' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'parar_robo.bat';
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+
+      downloadNetPrepare() {
+        let bat = `@echo off\r\n`;
+        bat += `chcp 1252 >nul\r\n`;
+        bat += `title Preparacao de rede e servicos - Cresol RPA\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo ============================================================\r\n`;
+        bat += `echo   Preparacao de rede e servicos - Cresol RPA\r\n`;
+        bat += `echo ============================================================\r\n`;
+        bat += `echo.\r\n`;
+        bat += `\r\n`;
+        bat += `:: ---- 1. Desabilitar adaptador de rede ----\r\n`;
+        bat += `echo [1/5] Desabilitando adaptador de rede...\r\n`;
+        bat += `echo.\r\n`;
+        bat += `powershell -NoProfile -ExecutionPolicy Bypass -Command "$adapters = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' -or $_.Status -eq 'Disconnected' }; foreach ($a in $adapters) { Write-Host ('  Desabilitando: ' + $a.Name + ' (' + $a.InterfaceDescription + ')'); Disable-NetAdapter -Name $a.Name -Confirm:$false }" 2>nul\r\n`;
+        bat += `if %errorlevel% neq 0 (\r\n`;
+        bat += `  echo   PowerShell falhou, tentando via netsh...\r\n`;
+        bat += `  for /f "tokens=*" %%i in ('netsh interface show interface ^| findstr /i "Connected Disconnected"') do (\r\n`;
+        bat += `    for /f "tokens=4*" %%a in ("%%i") do (\r\n`;
+        bat += `      echo   Desabilitando: %%a %%b\r\n`;
+        bat += `      netsh interface set interface "%%a %%b" disabled >nul 2>&1\r\n`;
+        bat += `    )\r\n`;
+        bat += `  )\r\n`;
+        bat += `)\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo   Adaptador desabilitado. Aguardando 15 segundos para reset completo...\r\n`;
+        bat += `timeout /t 15 >nul\r\n`;
+        bat += `echo.\r\n`;
+        bat += `\r\n`;
+        bat += `:: ---- 2. Reabilitar adaptador de rede ----\r\n`;
+        bat += `echo [2/5] Reabilitando adaptador de rede...\r\n`;
+        bat += `powershell -NoProfile -ExecutionPolicy Bypass -Command "$adapters = Get-NetAdapter | Where-Object { $_.Status -eq 'Disabled' }; foreach ($a in $adapters) { Write-Host ('  Habilitando: ' + $a.Name); Enable-NetAdapter -Name $a.Name -Confirm:$false }" 2>nul\r\n`;
+        bat += `if %errorlevel% neq 0 (\r\n`;
+        bat += `  echo   PowerShell falhou, tentando via netsh...\r\n`;
+        bat += `  for /f "tokens=*" %%i in ('netsh interface show interface ^| findstr /i "Disabled Desativado"') do (\r\n`;
+        bat += `    for /f "tokens=4*" %%a in ("%%i") do (\r\n`;
+        bat += `      echo   Habilitando: %%a %%b\r\n`;
+        bat += `      netsh interface set interface "%%a %%b" enabled >nul 2>&1\r\n`;
+        bat += `    )\r\n`;
+        bat += `  )\r\n`;
+        bat += `)\r\n`;
+        bat += `echo   Aguardando adaptador inicializar...\r\n`;
+        bat += `timeout /t 5 >nul\r\n`;
+        bat += `echo.\r\n`;
+        bat += `\r\n`;
+        bat += `:: ---- 3. Renovar IP e limpar DNS ----\r\n`;
+        bat += `echo [3/5] Renovando IP e limpando cache DNS...\r\n`;
+        bat += `ipconfig /release >nul 2>&1\r\n`;
+        bat += `timeout /t 3 >nul\r\n`;
+        bat += `ipconfig /renew >nul 2>&1\r\n`;
+        bat += `ipconfig /flushdns >nul 2>&1\r\n`;
+        bat += `nbtstat -R >nul 2>&1\r\n`;
+        bat += `echo   IP renovado e cache DNS limpo.\r\n`;
+        bat += `echo.\r\n`;
+        bat += `\r\n`;
+        bat += `:: ---- Aguardar conectividade ----\r\n`;
+        bat += `echo   Aguardando conexao com a rede...\r\n`;
+        bat += `set /a tentativa=0\r\n`;
+        bat += `:aguardar_rede\r\n`;
+        bat += `set /a tentativa+=1\r\n`;
+        bat += `ping -n 1 -w 2000 8.8.8.8 >nul 2>&1\r\n`;
+        bat += `if %errorlevel%==0 (\r\n`;
+        bat += `  echo   Rede OK ^(tentativa %tentativa%^)\r\n`;
+        bat += `  goto rede_ok\r\n`;
+        bat += `)\r\n`;
+        bat += `if %tentativa% lss 30 (\r\n`;
+        bat += `  echo   Sem conexao ainda... tentativa %tentativa%/30\r\n`;
+        bat += `  timeout /t 3 >nul\r\n`;
+        bat += `  goto aguardar_rede\r\n`;
+        bat += `)\r\n`;
+        bat += `echo   AVISO: Nao conseguiu conectar apos 30 tentativas.\r\n`;
+        bat += `echo   O robo pode falhar em passos que precisam de rede.\r\n`;
+        bat += `:rede_ok\r\n`;
+        bat += `echo.\r\n`;
+        bat += `\r\n`;
+        bat += `:: ---- 4. Reiniciar Cisco Secure Client ----\r\n`;
+        bat += `echo [4/5] Verificando Cisco Secure Client...\r\n`;
+        bat += `tasklist /fi "imagename eq vpnui.exe" 2>nul | findstr /i "vpnui" >nul 2>&1\r\n`;
+        bat += `if %errorlevel%==0 (\r\n`;
+        bat += `  echo   Cisco Secure Client detectado, reiniciando...\r\n`;
+        bat += `  taskkill /f /im vpnui.exe >nul 2>&1\r\n`;
+        bat += `  taskkill /f /im vpnagentd.exe >nul 2>&1\r\n`;
+        bat += `  timeout /t 3 >nul\r\n`;
+        bat += `  if exist "C:\\Program Files (x86)\\Cisco\\Cisco Secure Client\\UI\\vpnui.exe" (\r\n`;
+        bat += `    start "" "C:\\Program Files (x86)\\Cisco\\Cisco Secure Client\\UI\\vpnui.exe"\r\n`;
+        bat += `    echo   Cisco reiniciado.\r\n`;
+        bat += `  ) else if exist "C:\\Program Files (x86)\\Cisco\\Cisco AnyConnect Secure Mobility Client\\vpnui.exe" (\r\n`;
+        bat += `    start "" "C:\\Program Files (x86)\\Cisco\\Cisco AnyConnect Secure Mobility Client\\vpnui.exe"\r\n`;
+        bat += `    echo   Cisco reiniciado.\r\n`;
+        bat += `  ) else (\r\n`;
+        bat += `    echo   Executavel do Cisco nao encontrado no caminho padrao.\r\n`;
+        bat += `    echo   Se necessario, abra manualmente.\r\n`;
+        bat += `  )\r\n`;
+        bat += `) else (\r\n`;
+        bat += `  echo   Cisco Secure Client nao esta rodando ^(pulando^).\r\n`;
+        bat += `)\r\n`;
+        bat += `echo.\r\n`;
+        bat += `\r\n`;
+        bat += `:: ---- 5. Reiniciar Google Drive ----\r\n`;
+        bat += `echo [5/5] Verificando Google Drive...\r\n`;
+        bat += `tasklist /fi "imagename eq GoogleDriveFS.exe" 2>nul | findstr /i "GoogleDriveFS" >nul 2>&1\r\n`;
+        bat += `if %errorlevel%==0 (\r\n`;
+        bat += `  echo   Google Drive detectado, reiniciando...\r\n`;
+        bat += `  taskkill /f /im GoogleDriveFS.exe >nul 2>&1\r\n`;
+        bat += `  timeout /t 3 >nul\r\n`;
+        bat += `)\r\n`;
+        bat += `:: Inicia o Google Drive (mesmo se nao estava rodando)\r\n`;
+        bat += `if exist "%ProgramFiles%\\Google\\Drive File Stream\\launch.bat" (\r\n`;
+        bat += `  start "" cmd /c "%ProgramFiles%\\Google\\Drive File Stream\\launch.bat"\r\n`;
+        bat += `  echo   Google Drive iniciado.\r\n`;
+        bat += `) else if exist "%LocalAppData%\\Google\\GoogleDriveFS\\GoogleDriveFS.exe" (\r\n`;
+        bat += `  start "" "%LocalAppData%\\Google\\GoogleDriveFS\\GoogleDriveFS.exe"\r\n`;
+        bat += `  echo   Google Drive iniciado.\r\n`;
+        bat += `) else (\r\n`;
+        bat += `  echo   Google Drive nao encontrado no caminho padrao.\r\n`;
+        bat += `  echo   Se necessario, abra manualmente.\r\n`;
+        bat += `)\r\n`;
+        bat += `echo.\r\n`;
+        bat += `\r\n`;
+        bat += `echo ============================================================\r\n`;
+        bat += `echo   Preparacao concluida!\r\n`;
+        bat += `echo ============================================================\r\n`;
+        bat += `exit\r\n`;
+
+        const blob = new Blob([bat], { type: 'application/bat;charset=windows-1252' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'preparar_rede.bat';
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+
+      downloadNicPowerFix() {
+        let ps = `# Desabilitar gerenciamento de energia dos adaptadores de rede\r\n`;
+        ps += `# Isso impede o Windows de desligar o adaptador para economizar energia\r\n`;
+        ps += `# Execute UMA VEZ como Administrador\r\n`;
+        ps += `\r\n`;
+        ps += `$adapters = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' }\r\n`;
+        ps += `foreach ($adapter in $adapters) {\r\n`;
+        ps += `    Write-Host "Processando: $($adapter.Name) ($($adapter.InterfaceDescription))"\r\n`;
+        ps += `    \r\n`;
+        ps += `    # Desabilitar "Allow the computer to turn off this device to save power"\r\n`;
+        ps += `    $pnpDevice = Get-PnpDevice | Where-Object { $_.FriendlyName -eq $adapter.InterfaceDescription }\r\n`;
+        ps += `    if ($pnpDevice) {\r\n`;
+        ps += `        $propPath = "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002bE10318}"\r\n`;
+        ps += `        $subKeys = Get-ChildItem $propPath -ErrorAction SilentlyContinue\r\n`;
+        ps += `        foreach ($key in $subKeys) {\r\n`;
+        ps += `            $desc = (Get-ItemProperty $key.PSPath -ErrorAction SilentlyContinue).DriverDesc\r\n`;
+        ps += `            if ($desc -eq $adapter.InterfaceDescription) {\r\n`;
+        ps += `                # PnPCapabilities: 0x18 (24) = desabilita power management\r\n`;
+        ps += `                Set-ItemProperty -Path $key.PSPath -Name 'PnPCapabilities' -Value 24 -Type DWord -Force\r\n`;
+        ps += `                Write-Host "  Power management DESABILITADO para: $desc" -ForegroundColor Green\r\n`;
+        ps += `            }\r\n`;
+        ps += `        }\r\n`;
+        ps += `    }\r\n`;
+        ps += `    \r\n`;
+        ps += `    # Desabilitar Energy Efficient Ethernet e Green Ethernet se suportados\r\n`;
+        ps += `    $params = @('EEELinkAdvertisement','*EEE','ReduceSpeedOnPowerDown','EnableGreenEthernet','AutoPowerSaveModeEnabled')\r\n`;
+        ps += `    foreach ($param in $params) {\r\n`;
+        ps += `        $adv = Get-NetAdapterAdvancedProperty -Name $adapter.Name -RegistryKeyword $param -ErrorAction SilentlyContinue\r\n`;
+        ps += `        if ($adv) {\r\n`;
+        ps += `            Set-NetAdapterAdvancedProperty -Name $adapter.Name -RegistryKeyword $param -RegistryValue 0 -ErrorAction SilentlyContinue\r\n`;
+        ps += `            Write-Host "  $param DESABILITADO" -ForegroundColor Yellow\r\n`;
+        ps += `        }\r\n`;
+        ps += `    }\r\n`;
+        ps += `}\r\n`;
+        ps += `\r\n`;
+        ps += `Write-Host ""\r\n`;
+        ps += `Write-Host "Concluido! Reinicie o computador para aplicar todas as alteracoes." -ForegroundColor Cyan\r\n`;
+        ps += `Write-Host "Pressione qualquer tecla para sair..."\r\n`;
+        ps += `$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')\r\n`;
+
+        const blob = new Blob([ps], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'desabilitar_poweroff_rede.ps1';
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+
+      downloadFirefoxProfile() {
+        let bat = `@echo off\r\n`;
+        bat += `chcp 65001 >nul\r\n`;
+        bat += `title Configurar perfil Firefox para RoboRPA\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo ============================================================\r\n`;
+        bat += `echo   Configurar perfil Firefox dedicado para o RoboRPA\r\n`;
+        bat += `echo ============================================================\r\n`;
+        bat += `echo.\r\n`;
+        bat += `\r\n`;
+        bat += `:: Localizar Firefox\r\n`;
+        bat += `set "FF="\r\n`;
+        bat += `if exist "C:\\Program Files\\Mozilla Firefox\\firefox.exe" set "FF=C:\\Program Files\\Mozilla Firefox\\firefox.exe"\r\n`;
+        bat += `if exist "C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe" set "FF=C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe"\r\n`;
+        bat += `if "%FF%"=="" (\r\n`;
+        bat += `  echo   ERRO: Firefox nao encontrado.\r\n`;
+        bat += `  pause\r\n`;
+        bat += `  exit /b 1\r\n`;
+        bat += `)\r\n`;
+        bat += `echo   Firefox encontrado: %FF%\r\n`;
+        bat += `echo.\r\n`;
+        bat += `\r\n`;
+        bat += `:: Criar o perfil RoboRPA\r\n`;
+        bat += `echo [1/2] Criando perfil "RoboRPA"...\r\n`;
+        bat += `"%FF%" -CreateProfile "RoboRPA" 2>nul\r\n`;
+        bat += `timeout /t 2 >nul\r\n`;
+        bat += `echo   Perfil criado.\r\n`;
+        bat += `echo.\r\n`;
+        bat += `\r\n`;
+        bat += `:: Localizar a pasta do perfil\r\n`;
+        bat += `echo [2/2] Aplicando configuracoes anti-distracao...\r\n`;
+        bat += `set "PROF_DIR="\r\n`;
+        bat += `for /f "tokens=*" %%d in ('dir /b /ad "%APPDATA%\\Mozilla\\Firefox\\Profiles" 2^>nul ^| findstr /i "RoboRPA"') do (\r\n`;
+        bat += `  set "PROF_DIR=%APPDATA%\\Mozilla\\Firefox\\Profiles\\%%d"\r\n`;
+        bat += `)\r\n`;
+        bat += `if "%PROF_DIR%"=="" (\r\n`;
+        bat += `  echo   ERRO: Pasta do perfil RoboRPA nao encontrada.\r\n`;
+        bat += `  echo   Tente abrir o Firefox manualmente com:  "%FF%" -P\r\n`;
+        bat += `  pause\r\n`;
+        bat += `  exit /b 1\r\n`;
+        bat += `)\r\n`;
+        bat += `echo   Pasta do perfil: %PROF_DIR%\r\n`;
+        bat += `\r\n`;
+        bat += `:: Gravar user.js com todas as configuracoes\r\n`;
+        bat += `(\r\n`;
+        bat += `echo // ==========================================================\r\n`;
+        bat += `echo // Perfil Firefox dedicado para RoboRPA\r\n`;
+        bat += `echo // Desabilita tudo que pode desviar a automacao\r\n`;
+        bat += `echo // ==========================================================\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo // --- Inicializacao limpa ---\r\n`;
+        bat += `echo user_pref^("browser.startup.page", 0^);                          // Pagina em branco ao abrir\r\n`;
+        bat += `echo user_pref^("browser.startup.homepage_override.mstone", "ignore"^); // Nao mostra novidades apos update\r\n`;
+        bat += `echo user_pref^("browser.startup.firstrunSkipsHomepage", true^);       // Pula tela de boas-vindas\r\n`;
+        bat += `echo user_pref^("browser.aboutwelcome.enabled", false^);               // Desabilita pagina de boas-vindas\r\n`;
+        bat += `echo user_pref^("browser.startup.upgradeDialog.enabled", false^);      // Sem dialogo de upgrade\r\n`;
+        bat += `echo user_pref^("startup.homepage_welcome_url", ""^);                  // Sem URL de boas-vindas\r\n`;
+        bat += `echo user_pref^("startup.homepage_welcome_url.additional", ""^);       // Sem URL adicional\r\n`;
+        bat += `echo user_pref^("startup.homepage_override_url", ""^);                 // Sem override de homepage\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo // --- Restauracao de sessao ---\r\n`;
+        bat += `echo user_pref^("browser.sessionstore.resume_from_crash", false^);     // Nao restaura abas apos crash\r\n`;
+        bat += `echo user_pref^("browser.sessionstore.max_resumed_crashes", 0^);       // Zero tentativas de restaurar\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo // --- Atualizacoes ---\r\n`;
+        bat += `echo user_pref^("app.update.enabled", false^);                         // Sem atualizacao automatica\r\n`;
+        bat += `echo user_pref^("app.update.auto", false^);                            // Sem download automatico\r\n`;
+        bat += `echo user_pref^("app.update.silent", true^);                           // Atualiza silenciosamente se atualizar\r\n`;
+        bat += `echo user_pref^("app.update.doorhanger", false^);                      // Sem notificacao de update\r\n`;
+        bat += `echo user_pref^("extensions.update.enabled", false^);                  // Sem update de extensoes\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo // --- Popups e notificacoes ---\r\n`;
+        bat += `echo user_pref^("dom.webnotifications.enabled", false^);               // Sem notificacoes web\r\n`;
+        bat += `echo user_pref^("permissions.default.desktop-notification", 2^);       // Bloqueia pedidos de notificacao\r\n`;
+        bat += `echo user_pref^("dom.push.enabled", false^);                           // Sem push notifications\r\n`;
+        bat += `echo user_pref^("browser.shell.checkDefaultBrowser", false^);          // Sem pergunta de navegador padrao\r\n`;
+        bat += `echo user_pref^("browser.shell.didSkipDefaultBrowserCheckOnFirstRun", true^);\r\n`;
+        bat += `echo user_pref^("browser.defaultbrowser.notificationbar", false^);     // Sem barra de navegador padrao\r\n`;
+        bat += `echo user_pref^("browser.tabs.warnOnClose", false^);                   // Sem aviso ao fechar abas\r\n`;
+        bat += `echo user_pref^("browser.tabs.warnOnCloseOtherTabs", false^);          // Sem aviso ao fechar outras abas\r\n`;
+        bat += `echo user_pref^("browser.tabs.warnOnOpen", false^);                    // Sem aviso ao abrir muitas abas\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo // --- Importacao e migração ---\r\n`;
+        bat += `echo user_pref^("browser.migrate.automigrate.enabled", false^);        // Sem migrar de outro navegador\r\n`;
+        bat += `echo user_pref^("browser.migrate.showBookmarksToolbarAfterMigration", false^);\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo // --- Interface limpa ---\r\n`;
+        bat += `echo user_pref^("browser.newtabpage.enabled", false^);                 // Nova aba = em branco\r\n`;
+        bat += `echo user_pref^("browser.newtabpage.activity-stream.feeds.section.topstories", false^);\r\n`;
+        bat += `echo user_pref^("browser.newtabpage.activity-stream.feeds.snippets", false^);\r\n`;
+        bat += `echo user_pref^("browser.newtabpage.activity-stream.feeds.topsites", false^);\r\n`;
+        bat += `echo user_pref^("browser.newtabpage.activity-stream.showSearch", false^);\r\n`;
+        bat += `echo user_pref^("browser.newtabpage.activity-stream.showSponsored", false^);\r\n`;
+        bat += `echo user_pref^("browser.newtabpage.activity-stream.showSponsoredTopSites", false^);\r\n`;
+        bat += `echo user_pref^("browser.newtabpage.activity-stream.feeds.recommendationprovider", false^);\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo // --- Pocket e extensoes embutidas ---\r\n`;
+        bat += `echo user_pref^("extensions.pocket.enabled", false^);                  // Desabilita Pocket\r\n`;
+        bat += `echo user_pref^("identity.fxaccounts.enabled", false^);                // Sem Firefox Account sync\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo // --- Traducao e dicas ---\r\n`;
+        bat += `echo user_pref^("browser.translations.automaticallyPopup", false^);    // Sem popup de traducao\r\n`;
+        bat += `echo user_pref^("browser.uitour.enabled", false^);                     // Sem tour guiado\r\n`;
+        bat += `echo user_pref^("browser.messaging-system.whatsNewPanel.enabled", false^); // Sem painel de novidades\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo // --- Barras e paineis ---\r\n`;
+        bat += `echo user_pref^("browser.toolbars.bookmarks.visibility", "never"^);    // Esconde barra de favoritos\r\n`;
+        bat += `echo user_pref^("browser.download.panel.shown", true^);                // Ja viu painel de download\r\n`;
+        bat += `echo user_pref^("browser.download.useDownloadDir", true^);             // Salva direto sem perguntar\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo // --- Desempenho e estabilidade ---\r\n`;
+        bat += `echo user_pref^("browser.cache.disk.enable", true^);\r\n`;
+        bat += `echo user_pref^("browser.cache.memory.enable", true^);\r\n`;
+        bat += `echo user_pref^("network.http.max-connections", 256^);\r\n`;
+        bat += `) > "%PROF_DIR%\\user.js"\r\n`;
+        bat += `\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo ============================================================\r\n`;
+        bat += `echo   Perfil "RoboRPA" configurado com sucesso!\r\n`;
+        bat += `echo.\r\n`;
+        bat += `echo   O robo ja esta preparado para usar este perfil.\r\n`;
+        bat += `echo   Para testar manualmente, execute:\r\n`;
+        bat += `echo   "%FF%" -P "RoboRPA"\r\n`;
+        bat += `echo ============================================================\r\n`;
+        bat += `echo.\r\n`;
+        bat += `pause\r\n`;
+
+        const blob = new Blob([bat], { type: 'application/bat;charset=windows-1252' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'configurar_firefox_roborpa.bat';
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+
+      downloadScheduler(id) {
+        const script = this.scripts.find(s => s.id === id);
+        if (!script) return;
+
+        const safe = this.safeFileName(script.name);
+        const taskName = `CresolRPA_${safe}`;
+        const time = (document.getElementById('sch-time').value || '08:00');
+        const freq = document.getElementById('sch-freq').value;
+
+        let flags = '';
+        let descricao = '';
+        const weekdayPt = { MON: 'segunda', TUE: 'terca', WED: 'quarta', THU: 'quinta', FRI: 'sexta', SAT: 'sabado', SUN: 'domingo' };
+        const ordem = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+
+        if (freq === 'ONCE') {
+          const dateIso = document.getElementById('sch-date').value;
+          if (!dateIso) { alert('Escolha a data para o agendamento "Uma vez".'); return; }
+          const brDate = this.isoToBrDate(dateIso);
+          flags = `/sc ONCE /sd ${brDate} /st ${time}`;
+          descricao = `uma vez em ${brDate} as ${time}`;
+        } else if (freq === 'DAILY') {
+          flags = `/sc DAILY /st ${time}`;
+          descricao = `todos os dias as ${time}`;
+        } else if (freq === 'WEEKDAYS') {
+          flags = `/sc WEEKLY /d MON,TUE,WED,THU,FRI /st ${time}`;
+          descricao = `de segunda a sexta as ${time}`;
+        } else if (freq === 'WEEKLY') {
+          const dias = Array.from(document.querySelectorAll('.sch-weekday:checked')).map(c => c.value);
+          if (dias.length === 0) { alert('Marque pelo menos um dia da semana.'); return; }
+          dias.sort((a, b) => ordem.indexOf(a) - ordem.indexOf(b));
+          flags = `/sc WEEKLY /d ${dias.join(',')} /st ${time}`;
+          descricao = `toda ${dias.map(d => weekdayPt[d]).join(', ')} as ${time}`;
+        } else if (freq === 'MONTHLY') {
+          const lastday = document.getElementById('sch-lastday').checked;
+          if (lastday) {
+            flags = `/sc MONTHLY /mo LASTDAY /m JAN,FEB,MAR,APR,MAY,JUN,JUL,AUG,SEP,OCT,NOV,DEC /st ${time}`;
+            descricao = `todo ultimo dia do mes as ${time}`;
+          } else {
+            const dia = parseInt(document.getElementById('sch-monthday').value) || 0;
+            if (dia < 1 || dia > 31) { alert('Escolha um dia entre 1 e 31.'); return; }
+            flags = `/sc MONTHLY /d ${dia} /st ${time}`;
+            descricao = `todo dia ${dia} as ${time}`;
+          }
+        }
+
+        // .bat: textos sem acentos para evitar problemas de codificacao no console
+        let bat = '';
+        bat += `@echo off\n`;
+        bat += `chcp 1252 >nul\n`;
+        bat += `title Agendador Cresol RPA\n`;
+        bat += `echo ============================================\n`;
+        bat += `echo  Agendador do robo: ${safe}\n`;
+        bat += `echo ============================================\n`;
+        bat += `echo.\n`;
+        bat += `set "ROBO=%~dp0${safe}.vbs"\n`;
+        bat += `if not exist "%ROBO%" (\n`;
+        bat += `  echo [ERRO] Arquivo do robo nao encontrado:\n`;
+        bat += `  echo    %ROBO%\n`;
+        bat += `  echo.\n`;
+        bat += `  echo Coloque este .bat na MESMA pasta do arquivo .vbs do robo.\n`;
+        bat += `  echo.\n`;
+        bat += `  pause\n`;
+        bat += `  exit /b 1\n`;
+        bat += `)\n`;
+        bat += `schtasks /create /tn "${taskName}" /tr "wscript.exe \\"%ROBO%\\"" ${flags} /f\n`;
+        bat += `if %errorlevel%==0 (\n`;
+        bat += `  echo.\n`;
+        bat += `  echo [OK] Agendamento criado com sucesso.\n`;
+        bat += `  echo O robo vai rodar ${descricao}.\n`;
+        bat += `  echo.\n`;
+        bat += `  echo Ajustando energia: acordar o PC e rodar mesmo apos horario perdido...\n`;
+        // Ajustes que o schtasks /create nao oferece: acordar o PC, rodar se perdido, e na bateria.
+        bat += `  powershell -NoProfile -ExecutionPolicy Bypass -Command "$t = Get-ScheduledTask -TaskName '${taskName}'; $t.Settings.WakeToRun = $true; $t.Settings.StartWhenAvailable = $true; $t.Settings.DisallowStartIfOnBatteries = $false; $t.Settings.StopIfGoingOnBatteries = $false; Set-ScheduledTask -InputObject $t | Out-Null" 2>nul\n`;
+        bat += `  if errorlevel 1 (echo [AVISO] Nao foi possivel ajustar a energia automaticamente. Veja a observacao abaixo.) else (echo [OK] Energia ajustada: o PC sera acordado para executar.)\n`;
+        bat += `) else (\n`;
+        bat += `  echo.\n`;
+        bat += `  echo [ERRO] Nao foi possivel criar o agendamento.\n`;
+        bat += `)\n`;
+        bat += `echo.\n`;
+        bat += `echo IMPORTANTE: para o robo digitar, a tela precisa estar DESBLOQUEADA e a\n`;
+        bat += `echo janela do sistema aberta no horario. Acordar da suspensao mantem a tela\n`;
+        bat += `echo bloqueada; entao, para rodar 100%% sozinho, deixe o PC ligado e sem bloquear.\n`;
+        bat += `echo.\n`;
+        bat += `pause\n`;
+
+        this.downloadBat(`agendar_${safe}.bat`, bat);
+      },
+      downloadUnscheduler(id) {
+        const script = this.scripts.find(s => s.id === id);
+        if (!script) return;
+        const safe = this.safeFileName(script.name);
+        const taskName = `CresolRPA_${safe}`;
+
+        let bat = '';
+        bat += `@echo off\n`;
+        bat += `chcp 1252 >nul\n`;
+        bat += `title Cancelar Agendamento Cresol RPA\n`;
+        bat += `schtasks /delete /tn "${taskName}" /f\n`;
+        bat += `if %errorlevel%==0 (\n`;
+        bat += `  echo [OK] Agendamento removido.\n`;
+        bat += `) else (\n`;
+        bat += `  echo [AVISO] Nenhum agendamento encontrado com esse nome.\n`;
+        bat += `)\n`;
+        bat += `echo.\n`;
+        bat += `pause\n`;
+
+        this.downloadBat(`cancelar_${safe}.bat`, bat);
+      },
+
+      // Diagnóstico do agendamento: pergunta ao Windows por que a tarefa (não) rodou.
+      downloadScheduleDiagnostic(id) {
+        const script = this.scripts.find(s => s.id === id);
+        if (!script) return;
+        const safe = this.safeFileName(script.name);
+        const taskName = `CresolRPA_${safe}`;
+
+        let bat = `@echo off\r\n`;
+        bat += `chcp 1252 >nul\r\n`;
+        bat += `title Diagnostico do agendamento - Cresol RPA\r\n`;
+        bat += `set "OUT=%USERPROFILE%\\Desktop\\diagnostico_agendamento_${safe}.txt"\r\n`;
+        bat += `set "ROBO=%~dp0${safe}.vbs"\r\n`;
+        bat += `echo Coletando informacoes do agendamento... aguarde.\r\n`;
+        bat += `echo ===== DIAGNOSTICO DO AGENDAMENTO ===== > "%OUT%"\r\n`;
+        bat += `echo Robo: ${safe} >> "%OUT%"\r\n`;
+        bat += `echo Tarefa: ${taskName} >> "%OUT%"\r\n`;
+        bat += `echo Gerado em: %date% %time% >> "%OUT%"\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        // 1) O arquivo do robô existe na pasta?
+        bat += `echo ----- 1) ARQUIVO DO ROBO (.vbs) ----- >> "%OUT%"\r\n`;
+        bat += `if exist "%ROBO%" (echo [OK] Encontrado: %ROBO% >> "%OUT%") else (echo [PROBLEMA] NAO encontrado nesta pasta: %ROBO% >> "%OUT%" ^& echo Coloque este .bat na MESMA pasta do .vbs e rode de novo. >> "%OUT%")\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        // 2) A tarefa existe? Status, ultima execucao, ultimo resultado, proxima execucao
+        bat += `echo ----- 2) SITUACAO DA TAREFA NO WINDOWS ----- >> "%OUT%"\r\n`;
+        bat += `schtasks /query /tn "${taskName}" >nul 2>&1\r\n`;
+        bat += `if %errorlevel% neq 0 (\r\n`;
+        bat += `  echo [PROBLEMA] A tarefa "${taskName}" NAO existe no Agendador. >> "%OUT%"\r\n`;
+        bat += `  echo O agendador .bat pode nao ter sido executado, ou foi cancelado. >> "%OUT%"\r\n`;
+        bat += `  echo Rode o "agendar_${safe}.bat" novamente. >> "%OUT%"\r\n`;
+        bat += `) else (\r\n`;
+        bat += `  schtasks /query /tn "${taskName}" /v /fo LIST >> "%OUT%" 2>&1\r\n`;
+        bat += `)\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        // 3) Guia dos codigos de "Ultimo resultado"
+        bat += `echo ----- 3) O QUE SIGNIFICA O "ULTIMO RESULTADO" ----- >> "%OUT%"\r\n`;
+        bat += `echo   0 ^(0x0^)        = rodou com SUCESSO >> "%OUT%"\r\n`;
+        bat += `echo   267011 ^(0x41303^) = a tarefa NUNCA foi executada >> "%OUT%"\r\n`;
+        bat += `echo   267009 ^(0x41301^) = esta em execucao agora >> "%OUT%"\r\n`;
+        bat += `echo   267010 ^(0x41302^) = a tarefa esta DESABILITADA >> "%OUT%"\r\n`;
+        bat += `echo   267014 ^(0x41306^) = foi encerrada/cancelada antes do fim >> "%OUT%"\r\n`;
+        bat += `echo   1 / 2          = erro: arquivo nao encontrado ou caminho errado >> "%OUT%"\r\n`;
+        bat += `echo   2147942402     = arquivo do robo nao existe no caminho agendado >> "%OUT%"\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        // 4) Historico de eventos do Agendador para esta tarefa (motivos de nao ter disparado)
+        bat += `echo ----- 4) HISTORICO DO AGENDADOR (ultimas 48h) ----- >> "%OUT%"\r\n`;
+        bat += `echo Procure por mensagens como "condicao de inicializacao nao atendida" >> "%OUT%"\r\n`;
+        bat += `echo (ex.: PC estava em bateria, ou usuario nao estava conectado). >> "%OUT%"\r\n`;
+        bat += `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-TaskScheduler/Operational'; StartTime=(Get-Date).AddHours(-48)} -ErrorAction SilentlyContinue | Where-Object { $_.Message -match '${taskName}' } | Sort-Object TimeCreated | Format-List TimeCreated,Id,Message" >> "%OUT%" 2>&1\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        // 5) PC estava ligado/acordado no horario?
+        bat += `echo ----- 5) O PC ESTAVA LIGADO/ACORDADO NO HORARIO? ----- >> "%OUT%"\r\n`;
+        bat += `echo Procure pelo horario do agendamento. Se houver SUSPENDEU antes e ACORDOU >> "%OUT%"\r\n`;
+        bat += `echo depois, o PC estava dormindo na hora e a tarefa foi perdida. >> "%OUT%"\r\n`;
+        bat += `echo   42 = SUSPENDEU (dormiu)  ^|  107 = ACORDOU  ^|  1(Power-Troubleshooter) = ACORDOU >> "%OUT%"\r\n`;
+        bat += `echo   6005 = PC iniciou (boot)  ^|  6006 = desligou normalmente >> "%OUT%"\r\n`;
+        bat += `powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-WinEvent -FilterHashtable @{LogName='System'; StartTime=(Get-Date).AddHours(-48); ProviderName='Microsoft-Windows-Kernel-Power','Microsoft-Windows-Power-Troubleshooter','EventLog'} -ErrorAction SilentlyContinue | Where-Object { $_.Id -in 42,107,1,6005,6006,6008 } | Sort-Object TimeCreated | Format-List TimeCreated,Id,ProviderName,Message" >> "%OUT%" 2>&1\r\n`;
+        bat += `echo. >> "%OUT%"\r\n`;
+        bat += `echo Pronto^! Abrindo o relatorio...\r\n`;
+        bat += `start notepad "%OUT%"\r\n`;
+
+        const blob = new Blob([bat], { type: 'application/bat;charset=windows-1252' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `diagnostico_agendamento_${safe}.bat`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+
+
+      // Substitui {{VAR}} pelo valor real, igual ao VBS gerado
+      resolveText(text, script) {
+        return (text || '').replace(/\{\{([^}]+)\}\}/g, (m, varId) => {
+          const v = (script.variables || []).find(x => x.id === varId);
+          if (!v) return m;
+          if (v.type === 'date_calc') {
+            const offset = parseInt(v.defaultValue) || 0;
+            const d = new Date();
+            d.setDate(d.getDate() + offset);
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            return `${dd}/${mm}/${d.getFullYear()}`;
+          }
+          let val = this.runVariables[varId] || '';
+          if (v.type === 'date' && val) {
+            const p = val.split('-');
+            if (p.length === 3) val = `${p[2]}/${p[1]}/${p[0]}`;
+          }
+          return val;
+        });
+      },
+
+      describeStep(step, script) {
+        const suffix = step.description ? ` — ${step.description}` : '';
+        if (step.type === 'wait') return { icon: '⏱️', title: 'Esperar', detail: `Aguardar ${this.msToSec(step.value)} s${this.secHint(step.value)}${suffix}`, delay: parseInt(step.value) || 0 };
+        if (step.type === 'key') return { icon: '⌨️', title: 'Pressionar tecla', detail: `[${step.value}]${suffix}`, delay: this.stepPause(step) };
+        if (step.type === 'combo') return { icon: '🎹', title: 'Combinação de teclas', detail: `${this.comboPreview(step)}${suffix}`, delay: this.stepPause(step) };
+        if (step.type === 'run') return { icon: '🚀', title: 'Abrir programa', detail: `${step.value}${suffix}`, delay: this.stepPause(step) };
+        if (step.type === 'site') return { icon: '🌐', title: 'Abrir site (Firefox)', detail: `${step.value}${suffix}`, delay: this.stepPause(step) };
+        if (step.type === 'focus') return { icon: '🎯', title: 'Focar janela (Firefox)', detail: `Trazer "${step.value || 'Mozilla Firefox'}" para a frente${suffix}`, delay: this.stepPause(step) };
+        if (step.type === 'anchor') return { icon: '📍', title: 'Início padrão (ancorar foco)', detail: `Ctrl+L + ${Math.max(0, parseInt(step.value) || 0)} Tab — origem fixa a cada execução${suffix}`, delay: this.stepPause(step) };
+        if (step.type === 'totp') return { icon: '🔐', title: 'Código TOTP (Authenticator)', detail: `Gera e digita o código de 6 dígitos${suffix}`, delay: this.stepPause(step) };
+        if (step.type === 'type') return { icon: '🔤', title: 'Digitar texto', detail: `"${this.resolveText(step.value, script)}"${suffix}`, delay: this.stepPause(step) };
+        return { icon: '•', title: step.type, detail: `${step.value}${suffix}`, delay: 300 };
+      },
+
+      buildSimOps(script) {
+        const stepsExec = [...script.steps];
+        const hasLoop = script.loop && script.loop.enabled;
+        const count = hasLoop ? (parseInt(script.loop.count) || 1) : 1;
+        const ops = [];
+        for (let c = 1; c <= count; c++) {
+          if (hasLoop) ops.push({ icon: '🔁', title: `Ciclo ${c} de ${count}`, detail: 'Início da repetição', delay: 0 });
+          stepsExec.forEach(step => ops.push(this.describeStep(step, script)));
+        }
+        return ops;
+      },
+
+      openSimulator(scriptId) {
+        const script = this.scripts.find(s => s.id === scriptId);
+        if (!script) return;
+        if (script.steps.length === 0) { alert('Este robô não tem passos para simular.'); return; }
+
+        this.sim = { ops: this.buildSimOps(script), index: 0, running: false, paused: false, timer: null, speed: 1 };
+
+        let overlay = document.getElementById('sim-overlay');
+        if (!overlay) {
+          overlay = document.createElement('div');
+          overlay.id = 'sim-overlay';
+          document.body.appendChild(overlay);
+        }
+        overlay.className = 'sim-overlay';
+        overlay.innerHTML = `
+          <div class="sim-modal">
+            <div class="sim-header">
+              <h3>🧪 Simulação: ${script.name}</h3>
+              <button class="sim-close" onclick="app.closeSimulator()">✖</button>
+            </div>
+            <div class="sim-banner">✅ Modo de teste seguro: nada será digitado no seu computador. Isto apenas mostra o que o robô faria.</div>
+            <div class="sim-body">
+              <div class="sim-steps">
+                <h4>Passos (ordem de execução)</h4>
+                <div id="sim-steps-list">${this.renderSimSteps()}</div>
+              </div>
+              <div class="sim-log">
+                <h4>Registro</h4>
+                <div id="sim-log-list"><div class="sim-log-entry"><span class="ld">Clique em ▶️ Iniciar para começar a simulação.</span></div></div>
+              </div>
+            </div>
+            <div class="sim-controls" id="sim-controls">${this.renderSimControls()}</div>
+          </div>
+        `;
+      },
+
+      renderSimSteps() {
+        return this.sim.ops.map((op, i) => {
+          let cls = 'sim-step-row';
+          if (i < this.sim.index) cls += ' done';
+          if (i === this.sim.index && this.sim.running) cls += ' current';
+          return `<div class="${cls}"><span class="si">${op.icon}</span><span><b>${op.title}</b> <span class="ld">${op.detail}</span></span></div>`;
+        }).join('');
+      },
+
+      renderSimControls() {
+        const s = this.sim;
+        const atEnd = s.index >= s.ops.length;
+        let playLabel = '▶️ Iniciar';
+        if (s.paused) playLabel = '▶️ Continuar';
+        else if (atEnd && !s.running) playLabel = '🔄 Reiniciar';
+        else if (s.index > 0 && !s.running) playLabel = '▶️ Continuar';
+        const playAction = s.paused ? 'app.simResume()' : 'app.simStart()';
+        return `
+          <button class="sim-btn-play" onclick="${playAction}" ${s.running && !s.paused ? 'disabled' : ''}>${playLabel}</button>
+          <button class="sim-btn-pause" onclick="app.simPause()" ${(!s.running || s.paused) ? 'disabled' : ''}>⏸️ Pausar</button>
+          <button class="sim-btn-stop" onclick="app.simStop()" ${(s.index === 0 && !s.running) ? 'disabled' : ''}>⏹️ Parar</button>
+          <div class="sim-speed">
+            <span>Velocidade:</span>
+            <select onchange="app.sim.speed = parseFloat(this.value)">
+              <option value="1" ${s.speed === 1 ? 'selected' : ''}>Tempo real</option>
+              <option value="4" ${s.speed === 4 ? 'selected' : ''}>Rápido (4x)</option>
+              <option value="0" ${s.speed === 0 ? 'selected' : ''}>Instantâneo</option>
+            </select>
+          </div>
+        `;
+      },
+
+      updateSimControls() { const el = document.getElementById('sim-controls'); if (el) el.innerHTML = this.renderSimControls(); },
+      refreshSimSteps() { const el = document.getElementById('sim-steps-list'); if (el) el.innerHTML = this.renderSimSteps(); },
+      simLog(op) {
+        const log = document.getElementById('sim-log-list');
+        if (!log) return;
+        const entry = document.createElement('div');
+        entry.className = 'sim-log-entry';
+        entry.innerHTML = `<span class="si">${op.icon}</span> <span class="lt">${op.title}</span> <span class="ld">${op.detail || ''}</span>`;
+        log.appendChild(entry);
+        log.scrollTop = log.scrollHeight;
+      },
+
+      simStart() {
+        if (!this.sim) return;
+        if (this.sim.index >= this.sim.ops.length) this.sim.index = 0;
+        this.sim.running = true;
+        this.sim.paused = false;
+        this.updateSimControls();
+        this.simNext();
+      },
+      simNext() {
+        if (!this.sim || !this.sim.running || this.sim.paused) return;
+        if (this.sim.index >= this.sim.ops.length) {
+          this.sim.running = false;
+          this.simLog({ icon: '✅', title: 'Simulação concluída', detail: 'Nenhuma tecla foi enviada ao sistema.' });
+          this.refreshSimSteps();
+          this.updateSimControls();
+          return;
+        }
+        const op = this.sim.ops[this.sim.index];
+        this.refreshSimSteps();
+        this.simLog(op);
+        const delay = this.sim.speed === 0 ? 120 : Math.max(120, (op.delay || 200) / this.sim.speed);
+        this.sim.timer = setTimeout(() => { this.sim.index++; this.simNext(); }, delay);
+      },
+      simPause() {
+        if (!this.sim || !this.sim.running) return;
+        this.sim.paused = true;
+        clearTimeout(this.sim.timer);
+        this.simLog({ icon: '⏸️', title: 'Pausado', detail: '' });
+        this.updateSimControls();
+      },
+      simResume() {
+        if (!this.sim || !this.sim.running) return;
+        this.sim.paused = false;
+        this.simLog({ icon: '▶️', title: 'Retomado', detail: '' });
+        this.updateSimControls();
+        this.simNext();
+      },
+      simStop() {
+        if (!this.sim) return;
+        clearTimeout(this.sim.timer);
+        this.sim.running = false;
+        this.sim.paused = false;
+        this.sim.index = 0;
+        this.simLog({ icon: '⏹️', title: 'Parado', detail: 'Simulação reiniciada do começo.' });
+        this.refreshSimSteps();
+        this.updateSimControls();
+      },
+      closeSimulator() {
+        if (this.sim) clearTimeout(this.sim.timer);
+        const o = document.getElementById('sim-overlay');
+        if (o) o.classList.add('hidden');
+        this.sim = null;
+      },
+
+      // =========================================
+      // RENDERIZAÇÃO (DOM MANIPULATION)
+      // =========================================
+      render() {
+        document.getElementById('tab-runner').className = this.activeTab === 'runner' ? 'active' : '';
+        document.getElementById('tab-creator').className = this.activeTab === 'creator' ? 'active' : '';
+        document.getElementById('tab-settings').className = this.activeTab === 'settings' ? 'active' : '';
+
+        const runnerView = document.getElementById('runner-view');
+        const creatorView = document.getElementById('creator-view');
+        const settingsView = document.getElementById('settings-view');
+
+        runnerView.classList.add('hidden');
+        creatorView.classList.add('hidden');
+        settingsView.classList.add('hidden');
+
+        if (this.activeTab === 'creator') {
+          creatorView.classList.remove('hidden');
+          this.renderCreator();
+        } else if (this.activeTab === 'settings') {
+          settingsView.classList.remove('hidden');
+          this.renderSettings();
+        } else {
+          runnerView.classList.remove('hidden');
+          this.renderRunner();
+        }
+      },
+
+      renderRunner() {
+        // Renderizar Lista
+        const list = document.getElementById('script-list');
+        if (this.scripts.length === 0) {
+          list.innerHTML = `<div class="empty-state"><p>Nenhum robô criado.</p><button onclick="app.startNewScript()" style="color:#F26522; margin-top:10px; font-weight:bold;">Criar o primeiro</button></div>`;
+        } else {
+          list.innerHTML = this.scripts.map(s => `
+            <div class="script-item ${this.selectedScriptId === s.id ? 'active' : ''}" onclick="app.selectScript('${s.id}')">
+              <div class="script-item-title">${s.name}</div>
+              <div class="script-item-desc">${(s.steps || []).length} passos</div>
+            </div>
+          `).join('');
+        }
+
+        // Renderizar Conteúdo
+        const content = document.getElementById('runner-content');
+        const script = this.scripts.find(s => s.id === this.selectedScriptId);
+        
+        if (!script) {
+          content.innerHTML = `<div class="empty-state" style="margin-top:100px; font-size:18px;">Selecione um robô na lista para executar</div>`;
+          return;
+        }
+
+        let varsHtml = '';
+        const vars = script.variables || [];
+        if (vars.length > 0) {
+          varsHtml = `
+            <div class="variables-section">
+              <div class="variables-title">⚙️ Parâmetros da Execução</div>
+              ${vars.map(v => `
+                <div class="form-group">
+                  <label>
+                    ${v.name}
+                    ${v.type === 'date_calc' ? '<span style="color:#F26522; font-size:11px; font-weight:normal; margin-left:6px;">(Calculada no momento da execução do robô)</span>' : ''}
+                  </label>
+                  <input type="${(v.type === 'date' || v.type === 'date_calc') ? 'date' : 'text'}" 
+                         value="${this.runVariables[v.id] || ''}" 
+                         onchange="app.updateRunVar('${v.id}', this.value)"
+                         placeholder="Informe ${v.name.toLowerCase()}..."
+                         ${v.type === 'date_calc' ? 'disabled title="Esta data será calculada automaticamente pelo robô quando ele for executado."' : ''}>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }
+
+        content.innerHTML = `
+          <div class="script-header">
+            <div>
+              <div class="script-title">${script.name}</div>
+              <div class="script-desc">${script.description || 'Sem descrição.'}</div>
+            </div>
+            <div class="action-buttons">
+              <button class="btn-outline" onclick="app.editScript('${script.id}')">✏️ Editar</button>
+              <button class="btn-outline" onclick="app.deleteScript('${script.id}')" style="color:#ef4444;">🗑️ Excluir</button>
+            </div>
+          </div>
+          ${varsHtml}
+          <div class="alert-box">
+            <span style="font-size:24px;">⚠️</span>
+            <div>Ao clicar em baixar, um arquivo <strong>.vbs</strong> será salvo. Dê um duplo clique nele para rodar. Você terá 3 segundos para clicar na tela do sistema antes do robô começar a digitar.</div>
+          </div>
+          <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:16px; background:#fffbeb; border:1px solid #fde68a; padding:12px; border-radius:8px;">
+            <input type="checkbox" id="debug-checkbox" ${this.debugMode ? 'checked' : ''} onchange="app.debugMode = this.checked" style="width:auto; margin-top:3px;">
+            <label for="debug-checkbox" style="font-size:13px; color:#92400e; cursor:pointer;">
+              🐞 <strong>Modo depuração</strong> — gera um <strong>log de cada passo</strong> (com data/hora) na Área de Trabalho e <strong>narra os passos em voz</strong>, para você identificar exatamente onde o robô errou. O log abre no Bloco de Notas ao final.
+            </label>
+          </div>
+          <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:16px; background:#ecfdf5; border:1px solid #a7f3d0; padding:12px; border-radius:8px;">
+            <input type="checkbox" id="unattended-checkbox" ${this.unattendedMode ? 'checked' : ''} onchange="app.unattendedMode = this.checked" style="width:auto; margin-top:3px;">
+            <label for="unattended-checkbox" style="font-size:13px; color:#065f46; cursor:pointer;">
+              🤖 <strong>Modo desassistido</strong> (para agendamento) — troca os avisos que esperam clique por uma <strong>contagem automática</strong>, para o robô rodar sozinho. Ideal quando o próprio robô abre a janela (ex.: <strong>Abrir Site no Firefox</strong>), pois ela já fica em foco.
+            </label>
+          </div>
+          <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:16px; background:#eff6ff; border:1px solid #bfdbfe; padding:12px; border-radius:8px;">
+            <input type="checkbox" id="antiidle-checkbox" ${this.antiIdle ? 'checked' : ''} onchange="app.antiIdle = this.checked" style="width:auto; margin-top:3px;">
+            <label for="antiidle-checkbox" style="font-size:13px; color:#1e40af; cursor:pointer;">
+              ☕ <strong>Anti-ocioso</strong> (recomendado) — durante as <strong>pausas longas</strong> (ex.: os 15 min esperando o relatório), envia a tecla neutra <strong>F15</strong> a cada 50s para <strong>manter a máquina ativa</strong> e evitar o bloqueio. A F15 <strong>não digita nada nem muda o foco</strong>, e só é enviada dentro das pausas — portanto <strong>não atrapalha a digitação do robô</strong>.
+            </label>
+          </div>
+          <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+            <button class="btn-primary" onclick="app.downloadVBS('${script.id}')">
+              ⬇️ Baixar Arquivo Executável (.vbs)
+            </button>
+          </div>
+          <div style="font-size:13px; color:var(--on-surface-variant); margin-top:16px; background:var(--surface-bright); border:1px solid var(--outline-variant); border-radius:10px; padding:14px; line-height:1.6;">
+            💡 <strong>Testar a simulação</strong>, <strong>parar o robô</strong>, <strong>agendar a execução</strong> e os utilitários (anti-ocioso, diagnóstico) agora ficam na aba <strong>⚙️ Configurações</strong>.
+          </div>
+        `;
+      },
+
+      renderSettings() {
+        // Lista lateral de robôs (mesma da aba Executar)
+        const list = document.getElementById('settings-script-list');
+        if (this.scripts.length === 0) {
+          list.innerHTML = `<div class="empty-state"><p>Nenhum robô criado.</p></div>`;
+        } else {
+          list.innerHTML = this.scripts.map(s => `
+            <div class="script-item ${this.selectedScriptId === s.id ? 'active' : ''}" onclick="app.selectScript('${s.id}')">
+              <div class="script-item-title">${s.name}</div>
+              <div class="script-item-desc">${(s.steps || []).length} passos</div>
+            </div>
+          `).join('');
+        }
+
+        const content = document.getElementById('settings-content');
+        const script = this.scripts.find(s => s.id === this.selectedScriptId);
+        if (!script) {
+          content.innerHTML = `<div class="empty-state" style="margin-top:100px; font-size:18px;">Selecione um robô na lista para configurar</div>`;
+          return;
+        }
+
+        content.innerHTML = `
+          <div class="script-header">
+            <div>
+              <div class="script-title">⚙️ Configurações — ${script.name}</div>
+              <div class="script-desc">Teste a simulação, agende a execução e gerencie os utilitários deste robô.</div>
+            </div>
+          </div>
+
+          <div class="variables-section">
+            <div class="variables-title">🧪 Testar e parar</div>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+              <button class="btn-success" onclick="app.openSimulator('${script.id}')" style="padding:14px 24px; font-size:15px;">🧪 Testar (Simulação)</button>
+              <button class="btn-outline" onclick="app.downloadStopper()" title="Encerra na hora qualquer robô ou anti-ocioso em execução" style="color:#ef4444; border-color:#fecaca;">⛔ Baixar Parar Robô (.bat)</button>
+            </div>
+            <div style="font-size:12px; color:var(--on-surface-variant); margin-top:12px; line-height:1.5;">
+              <strong>⛔ Parada de emergência:</strong> guarde o <strong>parar_robo.bat</strong> na Área de Trabalho. Se precisar interromper, dê um <strong>duplo clique</strong> nele — encerra na hora o robô <em>e</em> o anti-ocioso. (Se o teclado estiver travado pelo robô, aperte <strong>Ctrl+Alt+Del</strong> primeiro para liberar.)
+            </div>
+          </div>
+
+          <div class="variables-section" style="margin-top:24px;">
+            <div class="variables-title">⏰ Agendar execução automática</div>
+            <div style="font-size:13px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; padding:10px 12px; border-radius:8px; margin-bottom:20px;">
+              ⚠️ No horário marcado o computador precisa estar <strong>ligado e desbloqueado</strong>, com a <strong>janela do sistema aberta</strong>. Como na execução manual, o robô digita na janela em foco — então o agendamento serve para <strong>iniciar o robô na hora certa</strong>, com você presente.
+            </div>
+            <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
+              <div class="form-group" style="margin:0; flex:1; min-width:160px;">
+                <label>Frequência</label>
+                <select id="sch-freq" onchange="app.renderScheduleFields()">
+                  <option value="ONCE">Uma vez</option>
+                  <option value="DAILY">Todos os dias</option>
+                  <option value="WEEKDAYS">Dias úteis (seg a sex)</option>
+                  <option value="WEEKLY">Escolher dias da semana</option>
+                  <option value="MONTHLY">Dia do mês (mensal)</option>
+                </select>
+              </div>
+              <div id="sch-extra" style="flex:1; min-width:160px;">${this.scheduleExtraHtml('ONCE')}</div>
+              <div class="form-group" style="margin:0; min-width:120px;">
+                <label>Horário</label>
+                <input type="time" id="sch-time" value="08:00">
+              </div>
+            </div>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:20px;">
+              <button class="btn-success" onclick="app.downloadScheduler('${script.id}')">📅 Gerar agendador (.bat)</button>
+              <button class="btn-outline" onclick="app.downloadUnscheduler('${script.id}')">🗑️ Gerar cancelador (.bat)</button>
+              <button class="btn-outline" onclick="app.downloadScheduleDiagnostic('${script.id}')" title="Descobre por que a tarefa agendada nao rodou">🔎 Diagnosticar agendamento (.bat)</button>
+            </div>
+            <div style="font-size:12px; color:#6b7280; margin-top:14px; line-height:1.5;">
+              <strong>Como usar:</strong> 1) Baixe o <strong>.vbs</strong> do robô na aba <strong>Executar Robôs</strong>. 2) Salve o <strong>.bat</strong> na <strong>mesma pasta</strong> do .vbs. 3) Dê um <strong>duplo clique no .bat</strong> para criar o agendamento no Windows. Para desfazer, use o cancelador.
+            </div>
+
+            <div style="margin-top:24px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:16px;">
+              <div style="font-weight:bold; color:#1e40af; margin-bottom:8px;">☕ Manter o computador ativo até a hora do robô</div>
+              <div style="font-size:13px; color:#1e3a8a; line-height:1.6; margin-bottom:14px;">
+                Agendou o robô para amanhã de manhã, mas o PC bloqueia por inatividade durante a noite?
+                Baixe o <strong>anti-ocioso avulso</strong> e deixe rodando. Ele só envia a tecla neutra
+                <strong>F15</strong> de tempos em tempos — <strong>não digita nada</strong> e <strong>para sozinho</strong>
+                no tempo que você escolher. Ao abrir, ele pergunta <strong>por quantas horas</strong> manter ativo.
+              </div>
+              <button class="btn-primary" onclick="app.downloadAntiIdle()">⬇️ Baixar Anti-ocioso (.vbs)</button>
+              <div style="font-size:12px; color:#6b7280; margin-top:12px; line-height:1.5;">
+                <strong>Como usar:</strong> dê um duplo clique no arquivo, informe quantas horas (ex.: 12),
+                e deixe-o aberto. Para parar antes, encerre <strong>wscript.exe</strong> no Gerenciador de Tarefas.
+                É independente do robô — pode rodar em qualquer máquina.
+              </div>
+              <hr style="border:none; border-top:1px solid #bfdbfe; margin:16px 0;">
+              <div style="font-weight:bold; color:#1e40af; margin-bottom:8px;">🔎 O PC desligou/suspendeu sozinho? Descubra o motivo</div>
+              <div style="font-size:13px; color:#1e3a8a; line-height:1.6; margin-bottom:14px;">
+                O anti-ocioso evita o bloqueio por inatividade, mas <strong>não impede</strong> um desligamento por
+                <strong>Windows Update</strong>, plano de energia ou queda de luz. Este diagnóstico lê os registros
+                do Windows e monta um relatório com o <strong>motivo exato</strong> do que aconteceu.
+              </div>
+              <button class="btn-outline" onclick="app.downloadDiagnostic()" style="color:#1e40af; border-color:#bfdbfe;">🔎 Baixar Diagnóstico (.bat)</button>
+              <div style="font-size:12px; color:#6b7280; margin-top:12px; line-height:1.5;">
+                <strong>Como usar:</strong> clique com o botão direito no <strong>diagnostico_desligamento.bat</strong> →
+                <strong>Executar como administrador</strong>. Ele abre um relatório na Área de Trabalho. Me envie o
+                conteúdo que eu te explico o que aconteceu.
+              </div>
+            </div>
+          </div>
+
+          <div class="variables-section" style="margin-top:24px;">
+            <div class="variables-title">🔌 Preparação de rede e serviços</div>
+            <div style="font-size:13px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; padding:10px 12px; border-radius:8px; margin-bottom:20px;">
+              ⚠️ Se a máquina fica em espera por muitas horas (ex: de um dia para o outro com o anti-ocioso), o
+              <strong>adaptador de rede pode parar de responder</strong> e o <strong>Google Drive pode parar de sincronizar</strong>.
+              Use os scripts abaixo para corrigir automaticamente.
+            </div>
+
+            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:16px; margin-bottom:16px;">
+              <div style="font-weight:bold; color:#166534; margin-bottom:8px;">🔄 Script de preparação (usar antes do robô)</div>
+              <div style="font-size:13px; color:#14532d; line-height:1.6; margin-bottom:14px;">
+                Reinicia o adaptador de rede, aguarda a conexão voltar, reinicia o Cisco Secure Client
+                (se estiver rodando) e reinicia o Google Drive. <strong>Agende para rodar 5 minutos antes
+                do horário do robô</strong>, ou execute manualmente quando a rede não estiver respondendo.
+              </div>
+              <button class="btn-success" onclick="app.downloadNetPrepare()">⬇️ Baixar preparar_rede.bat</button>
+              <div style="font-size:12px; color:#6b7280; margin-top:12px; line-height:1.5;">
+                <strong>Como usar:</strong> clique com o botão direito → <strong>Executar como administrador</strong>
+                (necessário para reiniciar o adaptador de rede). Para agendar automaticamente, crie uma tarefa no
+                Agendador de Tarefas do Windows para rodar este .bat alguns minutos antes do horário do robô, com
+                <strong>"Executar com privilégios mais altos"</strong> marcado.
+              </div>
+            </div>
+
+            <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:10px; padding:16px;">
+              <div style="font-weight:bold; color:#92400e; margin-bottom:8px;">⚡ Correção permanente: desabilitar economia de energia da rede</div>
+              <div style="font-size:13px; color:#78350f; line-height:1.6; margin-bottom:14px;">
+                O Windows pode <strong>desligar o adaptador de rede para economizar energia</strong>, mesmo com
+                o anti-ocioso ativo. Este script PowerShell desabilita essa opção <strong>de forma permanente</strong>.
+                Execute <strong>apenas uma vez</strong> como administrador — a configuração persiste após reiniciar.
+              </div>
+              <button class="btn-primary" onclick="app.downloadNicPowerFix()" style="background:#d97706;">⬇️ Baixar desabilitar_poweroff_rede.ps1</button>
+              <div style="font-size:12px; color:#6b7280; margin-top:12px; line-height:1.5;">
+                <strong>Como usar:</strong> clique com o botão direito no arquivo → <strong>Executar com o PowerShell</strong>
+                (como Administrador). Depois <strong>reinicie o computador</strong> para aplicar. Se o PowerShell bloquear
+                a execução, rode: <code style="background:#f3f4f6; padding:2px 6px; border-radius:4px;">Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="variables-section" style="margin-top:24px;">
+            <div class="variables-title">🦊 Perfil Firefox dedicado</div>
+            <div style="font-size:13px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; padding:10px 12px; border-radius:8px; margin-bottom:20px;">
+              ⚠️ O Firefox pode exibir <strong>abas restauradas</strong>, <strong>página de novidades</strong>,
+              <strong>popup de atualização</strong>, <strong>barra de favoritos</strong> ou perguntar se quer
+              ser o navegador padrão — tudo isso <strong>desvia o robô</strong> do caminho programado.
+            </div>
+
+            <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:16px;">
+              <div style="font-weight:bold; color:#9a3412; margin-bottom:8px;">🛡️ Criar perfil "RoboRPA" sem distrações</div>
+              <div style="font-size:13px; color:#7c2d12; line-height:1.6; margin-bottom:14px;">
+                Cria um perfil separado do Firefox chamado <strong>"RoboRPA"</strong> com todas as
+                distrações desabilitadas: sem restaurar abas, sem página de novidades, sem popups de
+                atualização, sem notificações, sem Pocket, sem barra de favoritos. O robô já usa este
+                perfil automaticamente ao abrir sites.<br><br>
+                <strong>Seu perfil pessoal do Firefox não é alterado</strong> — o perfil RoboRPA é
+                completamente separado.
+              </div>
+              <button class="btn-primary" onclick="app.downloadFirefoxProfile()" style="background:#ea580c;">⬇️ Baixar configurar_firefox_roborpa.bat</button>
+              <div style="font-size:12px; color:#6b7280; margin-top:12px; line-height:1.5;">
+                <strong>Como usar:</strong> dê um <strong>duplo clique</strong> no arquivo. Ele cria o perfil
+                e aplica as configurações automaticamente. Execute <strong>apenas uma vez</strong>.
+                Para testar, abra o Firefox manualmente com: <code style="background:#f3f4f6; padding:2px 6px; border-radius:4px;">firefox.exe -P "RoboRPA"</code>
+              </div>
+            </div>
+          </div>
+        `;
+      },
+
+      renderCreator() {
+        const view = document.getElementById('creator-view');
+        if (!this.editingScript) return;
+
+        if (!this.editingScript.variables) this.editingScript.variables = [];
+        if (!this.editingScript.steps) this.editingScript.steps = [];
+        let varsHtml = this.editingScript.variables.map(v => `
+          <div class="var-card">
+            <button class="btn-remove-var" onclick="app.removeVariable('${v.id}')">✖</button>
+            <input type="text" class="var-name" value="${v.name}" oninput="app.updateVariable('${v.id}', 'name', this.value)" placeholder="Nome do campo">
+            <div class="var-card-footer">
+              <select onchange="app.updateVariable('${v.id}', 'type', this.value)">
+                <option value="text" ${v.type === 'text' ? 'selected' : ''}>Texto Livre</option>
+                <option value="date" ${v.type === 'date' ? 'selected' : ''}>Data (Manual)</option>
+                <option value="date_calc" ${v.type === 'date_calc' ? 'selected' : ''}>Data Automática</option>
+              </select>
+              <span class="code-tag">{{${v.id}}}</span>
+            </div>
+            ${v.type === 'date_calc' ? `
+              <div style="margin-top: 12px; display: flex; align-items: center; gap: 8px; background: #f9fafb; padding: 8px; border-radius: 6px; border: 1px solid #e5e7eb;">
+                <span style="font-size: 12px; color: #4b5563; flex: 1;">Dias em relação a hoje:</span>
+                <input type="number" value="${v.defaultValue || '0'}" oninput="app.updateVariable('${v.id}', 'defaultValue', this.value)" style="width: 80px; padding: 4px 8px; margin: 0;" placeholder="ex: -15">
+              </div>
+            ` : ''}
+          </div>
+        `).join('');
+
+        if (this.editingScript.variables.length === 0) {
+          varsHtml = `<div class="empty-state" style="padding:20px;">Nenhuma variável criada.</div>`;
+        }
+
+        const stepCards = this.editingScript.steps.map((s, index) => {
+          let inputHtml = '';
+          if (s.type === 'key') {
+            inputHtml = `<select onchange="app.updateStep('${s.id}', 'value', this.value)">
+              ${this.commonKeys.map(k => `<option value="${k}" ${s.value === k ? 'selected' : ''}>${k}</option>`).join('')}
+              <option disabled>---</option>
+              <option value="A" ${s.value === 'A' ? 'selected' : ''}>Letra A</option>
+              <option value="B" ${s.value === 'B' ? 'selected' : ''}>Letra B</option>
+            </select>`;
+          } else if (s.type === 'combo') {
+            const comboKeys = ['Tab','Enter','Escape','Space','Delete','Home','End','A','C','V','X','Z','S','L','F4'];
+            inputHtml = `<div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+              <label style="display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer; width:auto;"><input type="checkbox" style="width:auto;" ${s.ctrl?'checked':''} onchange="app.updateStep('${s.id}','ctrl',this.checked)"> Ctrl</label>
+              <label style="display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer; width:auto;"><input type="checkbox" style="width:auto;" ${s.alt?'checked':''} onchange="app.updateStep('${s.id}','alt',this.checked)"> Alt</label>
+              <label style="display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer; width:auto;"><input type="checkbox" style="width:auto;" ${s.shift?'checked':''} onchange="app.updateStep('${s.id}','shift',this.checked)"> Shift</label>
+              <span style="color:#9ca3af;">+</span>
+              <select style="width:auto;" onchange="app.updateStep('${s.id}','value',this.value)">
+                ${comboKeys.map(k => `<option value="${k}" ${s.value === k ? 'selected' : ''}>${k}</option>`).join('')}
+              </select>
+              <span style="font-size:13px; font-weight:bold; color:#005A40; background:#f0fdf4; border:1px solid #bbf7d0; padding:3px 10px; border-radius:6px;">= ${this.comboPreview(s)}</span>
+            </div>`;
+          } else if (s.type === 'type') {
+            inputHtml = `<input type="text" value="${s.value}" onchange="app.updateStep('${s.id}', 'value', this.value)" placeholder="Texto para digitar...">`;
+          } else if (s.type === 'wait') {
+            inputHtml = `<div style="display:flex; align-items:center; gap:8px;">
+              <input type="number" min="0" step="0.1" value="${this.msToSec(s.value)}" onchange="app.updateStepSeconds('${s.id}', 'value', this.value)" style="width:100px;">
+              <span style="font-size:12px; color:#6b7280;">segundos${this.secHint(s.value)}</span>
+            </div>`;
+          } else if (s.type === 'run') {
+            inputHtml = `<input type="text" value="${s.value}" onchange="app.updateStep('${s.id}', 'value', this.value)" placeholder="Caminho ou comando (ex: calc.exe)">`;
+          } else if (s.type === 'site') {
+            inputHtml = `<input type="text" value="${s.value}" onchange="app.updateStep('${s.id}', 'value', this.value)" placeholder="Endereço do site (ex: https://www.cresol.com.br)">`;
+          } else if (s.type === 'focus') {
+            inputHtml = `<div style="display:flex; flex-direction:column; gap:6px;">
+              <input type="text" value="${s.value}" onchange="app.updateStep('${s.id}', 'value', this.value)" placeholder="Título da janela (ex: Mozilla Firefox)">
+              <span style="font-size:12px; color:#6b7280;">🎯 Traz a janela do Firefox (já aberta) para a frente, sem abrir nova aba. Basta parte do título.</span>
+            </div>`;
+          } else if (s.type === 'anchor') {
+            inputHtml = `<div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:13px; color:#374151;">Ctrl+L e depois</span>
+                <input type="number" min="0" step="1" value="${parseInt(s.value) || 0}" onchange="app.updateStep('${s.id}', 'value', this.value)" style="width:70px;">
+                <span style="font-size:13px; color:#374151;">Tab(s)</span>
+              </div>
+              <span style="font-size:12px; color:#6b7280;">📍 <strong>Início padrão:</strong> foca a barra de endereço (sempre o mesmo ponto) e entra na página com um nº fixo de Tabs. Coloque este passo <strong>logo após Abrir Site</strong>, assim toda execução começa do mesmo lugar.</span>
+            </div>`;
+          } else if (s.type === 'totp') {
+            inputHtml = `<div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:13px; color:#374151;">Chave secreta:</span>
+                <input type="password" value="${s.value || ''}" onchange="app.updateStep('${s.id}', 'value', this.value)" placeholder="JBSWY3DPEHPK3PXP" style="flex:1; font-family:monospace; letter-spacing:2px;">
+              </div>
+              <span style="font-size:12px; color:#6b7280;">🔐 <strong>Código TOTP:</strong> gera automaticamente o código de 6 dígitos do Google Authenticator e digita no campo em foco. Para obter a chave secreta, ao cadastrar o MFA no sistema, copie a <strong>chave manual</strong> (texto em Base32, geralmente ao lado do QR Code). A chave fica salva apenas neste navegador.</span>
+            </div>`;
+          }
+
+          const icon = s.type === 'key' ? '⌨️' : s.type === 'combo' ? '🎹' : s.type === 'type' ? '🔤' : s.type === 'wait' ? '⏱️' : s.type === 'site' ? '🌐' : s.type === 'focus' ? '🎯' : s.type === 'anchor' ? '📍' : s.type === 'totp' ? '🔐' : '🚀';
+          const stepNumber = index + 1;
+
+          return `
+            <div class="step-card" draggable="true"
+                 ondragstart="app.dragStart(event, ${index})"
+                 ondragover="app.dragOver(event, ${index})"
+                 ondragleave="app.dragLeave(event)"
+                 ondrop="app.dropStep(event, ${index})"
+                 ondragend="app.dragEnd(event)">
+              <div class="step-controls">
+                <span class="step-drag-handle" title="Arraste para reordenar">⠿</span>
+                <button onclick="app.moveStep(${index}, -1)" ${index === 0 ? 'disabled' : ''} title="Mover para cima">▲</button>
+                <button onclick="app.moveStep(${index}, 1)" ${index === this.editingScript.steps.length - 1 ? 'disabled' : ''} title="Mover para baixo">▼</button>
+              </div>
+              <div class="step-icon" title="Passo ${stepNumber}">
+                <div style="font-size: 10px; font-weight: bold; color: #9ca3af; position: absolute; top: -8px; left: -8px; background: white; padding: 2px 4px; border-radius: 4px; border: 1px solid #e5e7eb;">#${stepNumber}</div>
+                ${icon}
+              </div>
+              <div class="step-content">
+                <div>${inputHtml}</div>
+                <div>
+                  <input type="text" value="${s.description}" oninput="app.updateStep('${s.id}', 'description', this.value)" placeholder="Descrição (ex: Clica no botão)">
+                  ${s.type !== 'wait' ? `
+                    <div style="display:flex; align-items:center; gap:6px; margin-top:8px;">
+                      <span style="font-size:11px; color:#6b7280; white-space:nowrap;" title="Tempo que o robô aguarda DEPOIS desta ação antes de seguir. Aumente se a tela/lista não acompanha.">⏳ Pausa após:</span>
+                      <input type="number" min="0" step="0.1" value="${this.msToSec(this.stepPause(s))}" onchange="app.updateStepSeconds('${s.id}', 'pause', this.value)" style="width:90px; padding:6px;">
+                      <span style="font-size:11px; color:#6b7280;">segundos</span>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <button class="step-remove" onclick="app.duplicateStep('${s.id}')" title="Duplicar etapa" style="color:#005A40;">⧉</button>
+                <button class="step-remove" onclick="app.removeStep('${s.id}')" title="Excluir etapa">🗑️</button>
+              </div>
+            </div>
+          `;
+        });
+
+        // Ponto de inserção: o usuário clica onde o próximo passo deve entrar.
+        const insertAt = Math.min(Math.max(0, this.insertAt || 0), this.editingScript.steps.length);
+        this.insertAt = insertAt;
+        const divider = (pos) => `<div class="insert-point ${insertAt === pos ? 'active' : ''}" onclick="app.setInsertAt(${pos})" title="Inserir os próximos passos aqui"><span class="line"></span><span>${insertAt === pos ? '▼ os novos passos entram aqui' : '+ inserir aqui'}</span><span class="line"></span></div>`;
+
+        let stepsHtml;
+        if (stepCards.length === 0) {
+          stepsHtml = `<div class="empty-state">Nenhum passo adicionado. Use os botões acima.</div>`;
+        } else {
+          stepsHtml = divider(0) + stepCards.map((c, i) => c + divider(i + 1)).join('');
+        }
+
+        let tipsHtml = '';
+        if (this.editingScript.variables.length > 0) {
+          tipsHtml = `<div style="padding:12px; background:#eff6ff; border-top:1px solid #bfdbfe; font-size:13px; color:#1e40af; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <strong>Dica:</strong> Para usar variáveis no texto, copie e cole:
+            ${this.editingScript.variables.map(v => `<span class="code-tag" style="background:white;">{{${v.id}}}</span>`).join('')}
+          </div>`;
+        }
+        // Aviso específico: Alt+Tab via robô é instável no Windows.
+        if (this.editingScript.steps.some(s => s.type === 'combo' && s.alt && s.value === 'Tab')) {
+          tipsHtml += `<div style="padding:12px; background:#fffbeb; border-top:1px solid #fde68a; font-size:13px; color:#92400e; display:flex; gap:8px; align-items:flex-start; flex-wrap:wrap;">
+            <span>⚠️</span>
+            <div><strong>Sobre o Alt+Tab:</strong> o Windows costuma <strong>ignorar Alt+Tab enviado por robô</strong> (é uma proteção do sistema). Combinações como <strong>Ctrl+C, Ctrl+V, Alt+F4</strong> funcionam bem. Para <strong>alternar para o Firefox já aberto</strong> de forma confiável, use o passo <strong>🎯 Focar Firefox</strong> (traz a janela para a frente sem abrir nada novo).</div>
+          </div>`;
+        }
+
+        // Preserva a rolagem da lista de etapas para a tela não "pular" para o topo a cada mudança.
+        const prevStepsScroll = (document.querySelector('.steps-list') || {}).scrollTop || 0;
+        const prevLeftScroll = (document.querySelector('.col-left') || {}).scrollTop || 0;
+
+        view.innerHTML = `
+          <div class="creator-header">
+            <h2 style="font-size:24px; color:#111827;">Criar / Editar Robô</h2>
+            <div style="display:flex; gap:12px;">
+              <button class="btn-outline" onclick="app.cancelEdit()">Cancelar</button>
+              <button class="btn-success" onclick="app.saveEditingScript()">💾 Salvar Robô</button>
+            </div>
+          </div>
+          <div class="creator-columns">
+            <div class="col-left">
+              <div class="form-group">
+                <label>Nome do Robô</label>
+                <input type="text" value="${this.editingScript.name}" onchange="app.editingScript.name = this.value">
+              </div>
+              <div class="form-group">
+                <label>Descrição</label>
+                <textarea rows="3" onchange="app.editingScript.description = this.value" placeholder="O que este robô faz?">${this.editingScript.description}</textarea>
+              </div>
+              <div style="background:#f9fafb; padding:20px; border-radius:12px; border:1px solid #e5e7eb;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                  <h3 style="font-size:14px; color:#374151;">⚙️ Variáveis Dinâmicas</h3>
+                  <button class="btn-outline" style="padding:4px 8px; font-size:12px;" onclick="app.addVariable()">+ Adicionar</button>
+                </div>
+                ${varsHtml}
+              </div>
+            </div>
+            <div class="col-right">
+              <div class="steps-header">
+                <div>
+                  <h3 style="font-size:16px; color:#111827;">Passos do Robô</h3>
+                  <p style="font-size:12px; color:#6b7280; margin-top:2px;">💡 Clique em <strong>“+ inserir aqui”</strong> entre os passos para escolher onde o próximo será adicionado.</p>
+                </div>
+                <div class="steps-actions">
+                  <button onclick="app.addStep('key')">⌨️ Tecla</button>
+                  <button onclick="app.addStep('combo')">🎹 Combinação (2 teclas)</button>
+                  <button onclick="app.addStep('type')">🔤 Digitar Texto</button>
+                  <button onclick="app.addStep('wait')">⏱️ Esperar</button>
+                  <button onclick="app.addStep('run')">🚀 Abrir Programa</button>
+                  <button onclick="app.addStep('site')">🌐 Abrir Site (Firefox)</button>
+                  <button onclick="app.addStep('focus')">🎯 Focar Firefox</button>
+                  <button onclick="app.addStep('anchor')">📍 Início padrão (foco fixo)</button>
+                  <button onclick="app.addStep('totp')">🔐 Código TOTP (Authenticator)</button>
+                </div>
+              </div>
+              <div style="padding: 12px 20px; background: #f0fdf4; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <input type="checkbox" id="loop-checkbox" ${this.editingScript.loop && this.editingScript.loop.enabled ? 'checked' : ''} onchange="app.toggleLoop()">
+                  <label for="loop-checkbox" style="font-size: 14px; font-weight: 600; color: #166534; cursor: pointer;">🔁 Repetir todos os passos (Loop)</label>
+                </div>
+                ${this.editingScript.loop && this.editingScript.loop.enabled ? `
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 13px; color: #166534;">Quantas vezes?</span>
+                    <input type="number" value="${this.editingScript.loop.count || 2}" onchange="app.updateLoopCount(this.value)" style="width: 70px; padding: 4px; border-color: #bbf7d0;">
+                  </div>
+                ` : ''}
+              </div>
+              <div class="steps-list">
+                ${stepsHtml}
+              </div>
+              ${tipsHtml}
+            </div>
+          </div>
+        `;
+
+        // Restaura a rolagem onde o usuário estava (evita o "pulo" para o topo).
+        const newStepsList = document.querySelector('.steps-list');
+        if (newStepsList) newStepsList.scrollTop = prevStepsScroll;
+        const newLeft = document.querySelector('.col-left');
+        if (newLeft) newLeft.scrollTop = prevLeftScroll;
+      }
+    };
+
+    window.onload = function() {
+      var ver = document.getElementById('app-version');
+      if (ver) ver.textContent = 'v' + app.VERSION;
+      app.init();
+    };
+  </script>
+</body>
+</html>
