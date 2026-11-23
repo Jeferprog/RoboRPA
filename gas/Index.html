@@ -186,14 +186,17 @@
 </head>
 <body>
 
-  <!-- AVISO DE SEGURANÇA DO FIREFOX -->
+  <!-- AVISO DE ERROS -->
   <div id="storage-warning">
     ⚠️ Aviso: O Firefox bloqueou o salvamento automático por segurança. Use os botões "Exportar" e "Importar" no canto inferior esquerdo para salvar seus robôs no computador.
   </div>
 
+  <!-- DIAGNÓSTICO DE CARREGAMENTO (some sozinho quando tudo funciona) -->
+  <div id="load-diag" style="display:none; background:#fffbeb; color:#92400e; padding:10px 24px; font-size:13px; border-bottom:1px solid #fde68a; font-family:monospace;"></div>
+
   <!-- CABEÇALHO -->
   <div class="header">
-    <div class="header-title"><span class="material-symbols-outlined fill-icon">robot_2</span> Cresol RPA Web <span style="font-size:11px; font-weight:400; opacity:0.6; margin-left:4px;" id="app-version"></span></div>
+    <div class="header-title"><span class="material-symbols-outlined fill-icon">robot_2</span> Cresol RPA Web <span style="font-size:12px; font-weight:600; opacity:0.8; margin-left:8px; background:rgba(255,255,255,0.15); padding:2px 8px; border-radius:4px;" id="app-version"></span></div>
     <div class="nav-buttons">
       <button id="tab-runner" class="active" onclick="app.switchTab('runner')"><span class="material-symbols-outlined" style="font-size:18px;">play_circle</span> Executar Robôs</button>
       <button id="tab-creator" onclick="app.switchTab('creator')"><span class="material-symbols-outlined" style="font-size:18px;">edit_square</span> Criar / Editar</button>
@@ -313,30 +316,42 @@
       },
 
       init() {
+        var diag = document.getElementById('load-diag');
+        function diagAdd(msg) { if (diag) { diag.style.display = 'block'; diag.innerHTML += msg + '<br>'; } }
+
         console.log('[RPA v' + this.VERSION + '] init — modo:', this.storage.isGAS() ? 'Google Apps Script' : 'localStorage');
+        diagAdd('init() chamado — renderizando interface...');
         this.render();
+        diagAdd('render() OK — carregando dados...');
+
         this.storage.load((data, error) => {
           try {
             if (error) {
               console.error('[RPA] Erro ao carregar:', error);
+              diagAdd('❌ Erro no load: ' + (error.message || error));
               this.storageEnabled = false;
               const w = document.getElementById('storage-warning');
               if (w) { w.style.display = 'block'; w.textContent = 'Erro ao carregar robôs: ' + (error.message || error); }
             } else {
               var arr = Array.isArray(data) ? data : [];
               console.log('[RPA] Dados recebidos:', arr.length, 'robôs');
+              diagAdd('✅ Callback recebeu ' + arr.length + ' robôs');
               this.scripts = arr.map(s => ({ ...s, variables: s.variables || [], steps: s.steps || [] }));
               if (this.scripts.length > 0) {
                 this.selectedScriptId = this.scripts[0].id;
                 this.initRunVariables();
+                diagAdd('Robôs carregados: ' + this.scripts.map(function(s){ return s.name; }).join(', '));
               }
             }
           } catch(e) {
             console.error('[RPA] Erro ao processar dados:', e);
+            diagAdd('❌ Erro ao processar: ' + e.message);
             var w = document.getElementById('storage-warning');
             if (w) { w.style.display = 'block'; w.textContent = 'Erro ao processar robôs: ' + e.message; }
           }
+          diagAdd('Re-renderizando com dados...');
           this.render();
+          diagAdd('✅ Pronto!');
         });
       },
 
@@ -2300,6 +2315,46 @@
     window.onload = function() {
       var ver = document.getElementById('app-version');
       if (ver) ver.textContent = 'v' + app.VERSION;
+
+      var diag = document.getElementById('load-diag');
+      function diagLog(msg) {
+        if (!diag) return;
+        diag.style.display = 'block';
+        diag.innerHTML += msg + '<br>';
+      }
+
+      diagLog('v' + app.VERSION + ' | Início: ' + new Date().toLocaleTimeString());
+
+      var isGAS = (typeof google !== 'undefined' && google.script && google.script.run);
+      diagLog('Modo: ' + (isGAS ? '<b>Google Apps Script</b>' : 'localStorage (offline)'));
+
+      if (isGAS) {
+        diagLog('Chamando google.script.run.getRobots()...');
+        var t0 = Date.now();
+        google.script.run
+          .withSuccessHandler(function(data) {
+            var ms = Date.now() - t0;
+            diagLog('✅ Resposta em ' + ms + 'ms — tipo: ' + typeof data + ', é array: ' + Array.isArray(data) + ', itens: ' + (Array.isArray(data) ? data.length : '?'));
+            if (Array.isArray(data) && data.length > 0) {
+              diagLog('Primeiro robô: id=' + data[0].id + ', nome=' + data[0].name);
+            }
+            setTimeout(function(){ diag.style.display = 'none'; }, 8000);
+          })
+          .withFailureHandler(function(err) {
+            diagLog('❌ ERRO da planilha: ' + (err.message || err));
+          })
+          .getRobots();
+      } else {
+        diagLog('localStorage key: cresol_rpa_offline_v7');
+        try {
+          var raw = localStorage.getItem('cresol_rpa_offline_v7');
+          diagLog('Dados no storage: ' + (raw ? raw.length + ' chars' : 'vazio'));
+        } catch(e) {
+          diagLog('Erro ao ler localStorage: ' + e.message);
+        }
+        setTimeout(function(){ if (diag) diag.style.display = 'none'; }, 5000);
+      }
+
       app.init();
     };
   </script>
