@@ -186,13 +186,18 @@
 </head>
 <body>
 
+  <!-- BANNER DE VERIFICAÇÃO — se este texto aparece, o HTML novo está carregado -->
+  <div id="html-check-banner" style="background:#dc2626; color:#fff; padding:12px 24px; font-size:16px; font-weight:bold; text-align:center; font-family:Arial,sans-serif;">
+    v2.5.0 CARREGADO — Aguardando JavaScript...
+  </div>
+
   <!-- AVISO DE ERROS -->
   <div id="storage-warning">
     ⚠️ Aviso: O Firefox bloqueou o salvamento automático por segurança. Use os botões "Exportar" e "Importar" no canto inferior esquerdo para salvar seus robôs no computador.
   </div>
 
-  <!-- DIAGNÓSTICO DE CARREGAMENTO (some sozinho quando tudo funciona) -->
-  <div id="load-diag" style="display:none; background:#fffbeb; color:#92400e; padding:10px 24px; font-size:13px; border-bottom:1px solid #fde68a; font-family:monospace;"></div>
+  <!-- DIAGNÓSTICO DE CARREGAMENTO -->
+  <div id="load-diag" style="background:#fffbeb; color:#92400e; padding:10px 24px; font-size:13px; border-bottom:1px solid #fde68a; font-family:monospace;"></div>
 
   <!-- CABEÇALHO -->
   <div class="header">
@@ -247,11 +252,19 @@
        LÓGICA DO SISTEMA (JAVASCRIPT PURO)
        ========================================= -->
   <script>
-    // Captura erros globais para mostrar na tela (facilita debug no GAS)
+    // Atualiza banner para mostrar que JS começou a executar
+    (function(){
+      var b = document.getElementById('html-check-banner');
+      if (b) { b.textContent = 'v2.5.0 — JavaScript iniciou OK'; b.style.background = '#2563eb'; }
+      var d = document.getElementById('load-diag');
+      if (d) d.innerHTML = 'JS parse OK<br>';
+    })();
+
+    // Captura erros globais para mostrar na tela
     window.onerror = function(msg, src, line, col, err) {
       console.error('ERRO GLOBAL:', msg, 'em', src, 'linha', line);
-      var box = document.getElementById('storage-warning');
-      if (box) { box.style.display = 'block'; box.textContent = 'Erro JS: ' + msg + ' (linha ' + line + ')'; }
+      var box = document.getElementById('html-check-banner');
+      if (box) { box.style.display = 'block'; box.style.background = '#dc2626'; box.textContent = 'ERRO JS: ' + msg + ' (linha ' + line + ')'; }
     };
 
     window.app = {
@@ -2313,46 +2326,48 @@
     };
 
     window.onload = function() {
+      var banner = document.getElementById('html-check-banner');
       var ver = document.getElementById('app-version');
       if (ver) ver.textContent = 'v' + app.VERSION;
 
       var diag = document.getElementById('load-diag');
       function diagLog(msg) {
-        if (!diag) return;
-        diag.style.display = 'block';
-        diag.innerHTML += msg + '<br>';
+        if (diag) diag.innerHTML += msg + '<br>';
       }
 
-      diagLog('v' + app.VERSION + ' | Início: ' + new Date().toLocaleTimeString());
+      if (banner) { banner.textContent = 'v' + app.VERSION + ' — onload OK, detectando modo...'; banner.style.background = '#059669'; }
+      diagLog('onload | ' + new Date().toLocaleTimeString());
 
-      var isGAS = (typeof google !== 'undefined' && google.script && google.script.run);
-      diagLog('Modo: ' + (isGAS ? '<b>Google Apps Script</b>' : 'localStorage (offline)'));
+      var gasOk = false;
+      try {
+        gasOk = (typeof google !== 'undefined' && google.script && google.script.run);
+      } catch(e) {
+        diagLog('Erro ao detectar GAS: ' + e.message);
+      }
 
-      if (isGAS) {
+      diagLog('Modo: ' + (gasOk ? 'Google Apps Script' : 'localStorage'));
+
+      if (gasOk) {
+        if (banner) banner.textContent = 'v' + app.VERSION + ' — Chamando getRobots()...';
         diagLog('Chamando google.script.run.getRobots()...');
         var t0 = Date.now();
         google.script.run
           .withSuccessHandler(function(data) {
             var ms = Date.now() - t0;
-            diagLog('✅ Resposta em ' + ms + 'ms — tipo: ' + typeof data + ', é array: ' + Array.isArray(data) + ', itens: ' + (Array.isArray(data) ? data.length : '?'));
-            if (Array.isArray(data) && data.length > 0) {
-              diagLog('Primeiro robô: id=' + data[0].id + ', nome=' + data[0].name);
-            }
-            setTimeout(function(){ diag.style.display = 'none'; }, 8000);
+            var info = 'Resposta em ' + ms + 'ms — itens: ' + (Array.isArray(data) ? data.length : '?');
+            diagLog(info);
+            if (banner) { banner.textContent = 'v' + app.VERSION + ' — ' + info; }
+            setTimeout(function(){ if (banner) banner.style.display = 'none'; if (diag) diag.style.display = 'none'; }, 10000);
           })
           .withFailureHandler(function(err) {
-            diagLog('❌ ERRO da planilha: ' + (err.message || err));
+            var msg = 'ERRO planilha: ' + (err.message || err);
+            diagLog(msg);
+            if (banner) { banner.style.background = '#dc2626'; banner.textContent = 'v' + app.VERSION + ' — ' + msg; }
           })
           .getRobots();
       } else {
-        diagLog('localStorage key: cresol_rpa_offline_v7');
-        try {
-          var raw = localStorage.getItem('cresol_rpa_offline_v7');
-          diagLog('Dados no storage: ' + (raw ? raw.length + ' chars' : 'vazio'));
-        } catch(e) {
-          diagLog('Erro ao ler localStorage: ' + e.message);
-        }
-        setTimeout(function(){ if (diag) diag.style.display = 'none'; }, 5000);
+        diagLog('localStorage: cresol_rpa_offline_v7');
+        setTimeout(function(){ if (banner) banner.style.display = 'none'; if (diag) diag.style.display = 'none'; }, 6000);
       }
 
       app.init();
