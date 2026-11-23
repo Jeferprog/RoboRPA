@@ -248,25 +248,24 @@
     </div>
   </div>
 
+  <!-- SCRIPT DE DIAGNÓSTICO (separado do principal para capturar erros de parse) -->
+  <script>
+    (function(){
+      var b = document.getElementById('html-check-banner');
+      var d = document.getElementById('load-diag');
+      if (b) { b.textContent = 'v2.5.0 — Mini-script OK, carregando principal...'; b.style.background = '#2563eb'; }
+      if (d) d.innerHTML = 'Mini-script executou OK<br>';
+      window.onerror = function(msg, src, line, col, err) {
+        if (b) { b.style.display = 'block'; b.style.background = '#dc2626'; b.textContent = 'ERRO JS: ' + msg + ' (linha ' + line + ')'; }
+        if (d) d.innerHTML += 'ERRO: ' + msg + ' — linha ' + line + '<br>';
+      };
+    })();
+  </script>
+
   <!-- =========================================
        LÓGICA DO SISTEMA (JAVASCRIPT PURO)
        ========================================= -->
   <script>
-    // Atualiza banner para mostrar que JS começou a executar
-    (function(){
-      var b = document.getElementById('html-check-banner');
-      if (b) { b.textContent = 'v2.5.0 — JavaScript iniciou OK'; b.style.background = '#2563eb'; }
-      var d = document.getElementById('load-diag');
-      if (d) d.innerHTML = 'JS parse OK<br>';
-    })();
-
-    // Captura erros globais para mostrar na tela
-    window.onerror = function(msg, src, line, col, err) {
-      console.error('ERRO GLOBAL:', msg, 'em', src, 'linha', line);
-      var box = document.getElementById('html-check-banner');
-      if (box) { box.style.display = 'block'; box.style.background = '#dc2626'; box.textContent = 'ERRO JS: ' + msg + ' (linha ' + line + ')'; }
-    };
-
     window.app = {
       VERSION: '2.5.0',
       scripts: [],
