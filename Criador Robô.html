@@ -186,18 +186,10 @@
 </head>
 <body>
 
-  <!-- BANNER DE VERIFICAÇÃO — se este texto aparece, o HTML novo está carregado -->
-  <div id="html-check-banner" style="background:#dc2626; color:#fff; padding:12px 24px; font-size:16px; font-weight:bold; text-align:center; font-family:Arial,sans-serif;">
-    v2.5.0 CARREGADO — Aguardando JavaScript...
-  </div>
-
   <!-- AVISO DE ERROS -->
   <div id="storage-warning">
     ⚠️ Aviso: O Firefox bloqueou o salvamento automático por segurança. Use os botões "Exportar" e "Importar" no canto inferior esquerdo para salvar seus robôs no computador.
   </div>
-
-  <!-- DIAGNÓSTICO DE CARREGAMENTO -->
-  <div id="load-diag" style="background:#fffbeb; color:#92400e; padding:10px 24px; font-size:13px; border-bottom:1px solid #fde68a; font-family:monospace;"></div>
 
   <!-- CABEÇALHO -->
   <div class="header">
@@ -247,20 +239,6 @@
       </div>
     </div>
   </div>
-
-  <!-- SCRIPT DE DIAGNÓSTICO (separado do principal para capturar erros de parse) -->
-  <script>
-    (function(){
-      var b = document.getElementById('html-check-banner');
-      var d = document.getElementById('load-diag');
-      if (b) { b.textContent = 'v2.5.0 — Mini-script OK, carregando principal...'; b.style.background = '#2563eb'; }
-      if (d) d.innerHTML = 'Mini-script executou OK<br>';
-      window.onerror = function(msg, src, line, col, err) {
-        if (b) { b.style.display = 'block'; b.style.background = '#dc2626'; b.textContent = 'ERRO JS: ' + msg + ' (linha ' + line + ')'; }
-        if (d) d.innerHTML += 'ERRO: ' + msg + ' — linha ' + line + '<br>';
-      };
-    })();
-  </script>
 
   <!-- =========================================
        LÓGICA DO SISTEMA (JAVASCRIPT PURO)
@@ -328,42 +306,31 @@
       },
 
       init() {
-        var diag = document.getElementById('load-diag');
-        function diagAdd(msg) { if (diag) { diag.style.display = 'block'; diag.innerHTML += msg + '<br>'; } }
-
         console.log('[RPA v' + this.VERSION + '] init — modo:', this.storage.isGAS() ? 'Google Apps Script' : 'localStorage');
-        diagAdd('init() chamado — renderizando interface...');
         this.render();
-        diagAdd('render() OK — carregando dados...');
 
         this.storage.load((data, error) => {
           try {
             if (error) {
               console.error('[RPA] Erro ao carregar:', error);
-              diagAdd('❌ Erro no load: ' + (error.message || error));
               this.storageEnabled = false;
               const w = document.getElementById('storage-warning');
               if (w) { w.style.display = 'block'; w.textContent = 'Erro ao carregar robôs: ' + (error.message || error); }
             } else {
               var arr = Array.isArray(data) ? data : [];
               console.log('[RPA] Dados recebidos:', arr.length, 'robôs');
-              diagAdd('✅ Callback recebeu ' + arr.length + ' robôs');
               this.scripts = arr.map(s => ({ ...s, variables: s.variables || [], steps: s.steps || [] }));
               if (this.scripts.length > 0) {
                 this.selectedScriptId = this.scripts[0].id;
                 this.initRunVariables();
-                diagAdd('Robôs carregados: ' + this.scripts.map(function(s){ return s.name; }).join(', '));
               }
             }
           } catch(e) {
             console.error('[RPA] Erro ao processar dados:', e);
-            diagAdd('❌ Erro ao processar: ' + e.message);
             var w = document.getElementById('storage-warning');
             if (w) { w.style.display = 'block'; w.textContent = 'Erro ao processar robôs: ' + e.message; }
           }
-          diagAdd('Re-renderizando com dados...');
           this.render();
-          diagAdd('✅ Pronto!');
         });
       },
 
@@ -2325,50 +2292,8 @@
     };
 
     window.onload = function() {
-      var banner = document.getElementById('html-check-banner');
       var ver = document.getElementById('app-version');
       if (ver) ver.textContent = 'v' + app.VERSION;
-
-      var diag = document.getElementById('load-diag');
-      function diagLog(msg) {
-        if (diag) diag.innerHTML += msg + '<br>';
-      }
-
-      if (banner) { banner.textContent = 'v' + app.VERSION + ' — onload OK, detectando modo...'; banner.style.background = '#059669'; }
-      diagLog('onload | ' + new Date().toLocaleTimeString());
-
-      var gasOk = false;
-      try {
-        gasOk = (typeof google !== 'undefined' && google.script && google.script.run);
-      } catch(e) {
-        diagLog('Erro ao detectar GAS: ' + e.message);
-      }
-
-      diagLog('Modo: ' + (gasOk ? 'Google Apps Script' : 'localStorage'));
-
-      if (gasOk) {
-        if (banner) banner.textContent = 'v' + app.VERSION + ' — Chamando getRobots()...';
-        diagLog('Chamando google.script.run.getRobots()...');
-        var t0 = Date.now();
-        google.script.run
-          .withSuccessHandler(function(data) {
-            var ms = Date.now() - t0;
-            var info = 'Resposta em ' + ms + 'ms — itens: ' + (Array.isArray(data) ? data.length : '?');
-            diagLog(info);
-            if (banner) { banner.textContent = 'v' + app.VERSION + ' — ' + info; }
-            setTimeout(function(){ if (banner) banner.style.display = 'none'; if (diag) diag.style.display = 'none'; }, 10000);
-          })
-          .withFailureHandler(function(err) {
-            var msg = 'ERRO planilha: ' + (err.message || err);
-            diagLog(msg);
-            if (banner) { banner.style.background = '#dc2626'; banner.textContent = 'v' + app.VERSION + ' — ' + msg; }
-          })
-          .getRobots();
-      } else {
-        diagLog('localStorage: cresol_rpa_offline_v7');
-        setTimeout(function(){ if (banner) banner.style.display = 'none'; if (diag) diag.style.display = 'none'; }, 6000);
-      }
-
       app.init();
     };
   </script>
