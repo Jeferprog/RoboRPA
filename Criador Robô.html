@@ -193,7 +193,7 @@
 
   <!-- CABEÇALHO -->
   <div class="header">
-    <div class="header-title"><span class="material-symbols-outlined fill-icon">robot_2</span> Cresol RPA Web</div>
+    <div class="header-title"><span class="material-symbols-outlined fill-icon">robot_2</span> Cresol RPA Web <span style="font-size:11px; font-weight:400; opacity:0.6; margin-left:4px;" id="app-version"></span></div>
     <div class="nav-buttons">
       <button id="tab-runner" class="active" onclick="app.switchTab('runner')"><span class="material-symbols-outlined" style="font-size:18px;">play_circle</span> Executar Robôs</button>
       <button id="tab-creator" onclick="app.switchTab('creator')"><span class="material-symbols-outlined" style="font-size:18px;">edit_square</span> Criar / Editar</button>
@@ -244,12 +244,20 @@
        LÓGICA DO SISTEMA (JAVASCRIPT PURO)
        ========================================= -->
   <script>
+    // Captura erros globais para mostrar na tela (facilita debug no GAS)
+    window.onerror = function(msg, src, line, col, err) {
+      console.error('ERRO GLOBAL:', msg, 'em', src, 'linha', line);
+      var box = document.getElementById('storage-warning');
+      if (box) { box.style.display = 'block'; box.textContent = 'Erro JS: ' + msg + ' (linha ' + line + ')'; }
+    };
+
     window.app = {
+      VERSION: '2.5.0',
       scripts: [],
       activeTab: 'runner',
       selectedScriptId: null,
       editingScript: null,
-      insertAt: 0, // posição onde o próximo passo será inserido (índice no array)
+      insertAt: 0,
       runVariables: {},
       sim: null,
       debugMode: false,
@@ -269,15 +277,24 @@
         },
         load(onDone) {
           if (this.isGAS()) {
+            console.log('[RPA] Carregando robôs da Planilha Google...');
             google.script.run
-              .withSuccessHandler(function (data) { onDone(data || [], null); })
-              .withFailureHandler(function (err) { onDone(null, err); })
+              .withSuccessHandler(function (data) {
+                console.log('[RPA] Planilha respondeu:', Array.isArray(data) ? data.length + ' robôs' : typeof data);
+                onDone(data || [], null);
+              })
+              .withFailureHandler(function (err) {
+                console.error('[RPA] Falha ao ler planilha:', err);
+                onDone(null, err);
+              })
               .getRobots();
           } else {
+            var parsed;
             try {
               const saved = localStorage.getItem('cresol_rpa_offline_v7');
-              onDone(saved ? JSON.parse(saved) : [], null);
-            } catch (e) { onDone(null, e); }
+              parsed = saved ? JSON.parse(saved) : [];
+            } catch (e) { onDone(null, e); return; }
+            onDone(parsed, null);
           }
         },
         save(scripts, onDone, onError) {
@@ -295,20 +312,29 @@
         }
       },
 
-      // Inicialização com Proteção (assíncrona: dados podem vir da planilha)
       init() {
+        console.log('[RPA v' + this.VERSION + '] init — modo:', this.storage.isGAS() ? 'Google Apps Script' : 'localStorage');
         this.render();
         this.storage.load((data, error) => {
-          if (error) {
-            this.storageEnabled = false;
-            const w = document.getElementById('storage-warning');
-            if (w) w.style.display = 'block';
-          } else {
-            this.scripts = data || [];
-            if (this.scripts.length > 0) {
-              this.selectedScriptId = this.scripts[0].id;
-              this.initRunVariables();
+          try {
+            if (error) {
+              console.error('[RPA] Erro ao carregar:', error);
+              this.storageEnabled = false;
+              const w = document.getElementById('storage-warning');
+              if (w) { w.style.display = 'block'; w.textContent = 'Erro ao carregar robôs: ' + (error.message || error); }
+            } else {
+              var arr = Array.isArray(data) ? data : [];
+              console.log('[RPA] Dados recebidos:', arr.length, 'robôs');
+              this.scripts = arr.map(s => ({ ...s, variables: s.variables || [], steps: s.steps || [] }));
+              if (this.scripts.length > 0) {
+                this.selectedScriptId = this.scripts[0].id;
+                this.initRunVariables();
+              }
             }
+          } catch(e) {
+            console.error('[RPA] Erro ao processar dados:', e);
+            var w = document.getElementById('storage-warning');
+            if (w) { w.style.display = 'block'; w.textContent = 'Erro ao processar robôs: ' + e.message; }
           }
           this.render();
         });
@@ -346,8 +372,9 @@
         const reader = new FileReader();
         reader.onload = (e) => {
           try {
-            const importedScripts = JSON.parse(e.target.result);
-            if (Array.isArray(importedScripts)) {
+            const importedRaw = JSON.parse(e.target.result);
+            if (Array.isArray(importedRaw)) {
+              const importedScripts = importedRaw.map(s => ({ ...s, variables: s.variables || [], steps: s.steps || [] }));
               // Pergunta se quer substituir ou adicionar
               if (this.scripts.length > 0) {
                 if (confirm("Deseja substituir os robôs atuais pelos importados? (Clique em OK para substituir, ou Cancelar para apenas adicionar à lista existente)")) {
@@ -454,7 +481,7 @@
         if (!script) return;
         
         this.runVariables = {};
-        script.variables.forEach(v => {
+        (script.variables || []).forEach(v => {
           if (v.type === 'date_calc') {
             const offset = parseInt(v.defaultValue) || 0;
             const d = new Date();
@@ -714,9 +741,10 @@
         vbs += `\n`;
 
         // Declarar e inicializar variáveis no VBScript
-        if (script.variables.length > 0) {
+        const scriptVars = script.variables || [];
+        if (scriptVars.length > 0) {
           vbs += `' --- Inicialização de Variáveis ---\n`;
-          script.variables.forEach(v => {
+          scriptVars.forEach(v => {
             vbs += `Dim ${v.id}\n`;
             if (v.type === 'date_calc') {
               const offset = parseInt(v.defaultValue) || 0;
@@ -856,7 +884,7 @@
                 }
               } else {
                 const varId = parts[i];
-                if (script.variables.some(v => v.id === varId)) {
+                if ((script.variables || []).some(v => v.id === varId)) {
                   vbsParts.push(varId);
                 } else {
                   vbsParts.push('"' + this.escapeVBSText('{{' + varId + '}}') + '"');
@@ -1571,7 +1599,7 @@
       // Substitui {{VAR}} pelo valor real, igual ao VBS gerado
       resolveText(text, script) {
         return (text || '').replace(/\{\{([^}]+)\}\}/g, (m, varId) => {
-          const v = script.variables.find(x => x.id === varId);
+          const v = (script.variables || []).find(x => x.id === varId);
           if (!v) return m;
           if (v.type === 'date_calc') {
             const offset = parseInt(v.defaultValue) || 0;
@@ -1787,7 +1815,7 @@
           list.innerHTML = this.scripts.map(s => `
             <div class="script-item ${this.selectedScriptId === s.id ? 'active' : ''}" onclick="app.selectScript('${s.id}')">
               <div class="script-item-title">${s.name}</div>
-              <div class="script-item-desc">${s.steps.length} passos</div>
+              <div class="script-item-desc">${(s.steps || []).length} passos</div>
             </div>
           `).join('');
         }
@@ -1802,11 +1830,12 @@
         }
 
         let varsHtml = '';
-        if (script.variables.length > 0) {
+        const vars = script.variables || [];
+        if (vars.length > 0) {
           varsHtml = `
             <div class="variables-section">
               <div class="variables-title">⚙️ Parâmetros da Execução</div>
-              ${script.variables.map(v => `
+              ${vars.map(v => `
                 <div class="form-group">
                   <label>
                     ${v.name}
@@ -1877,7 +1906,7 @@
           list.innerHTML = this.scripts.map(s => `
             <div class="script-item ${this.selectedScriptId === s.id ? 'active' : ''}" onclick="app.selectScript('${s.id}')">
               <div class="script-item-title">${s.name}</div>
-              <div class="script-item-desc">${s.steps.length} passos</div>
+              <div class="script-item-desc">${(s.steps || []).length} passos</div>
             </div>
           `).join('');
         }
@@ -2042,6 +2071,8 @@
         const view = document.getElementById('creator-view');
         if (!this.editingScript) return;
 
+        if (!this.editingScript.variables) this.editingScript.variables = [];
+        if (!this.editingScript.steps) this.editingScript.steps = [];
         let varsHtml = this.editingScript.variables.map(v => `
           <div class="var-card">
             <button class="btn-remove-var" onclick="app.removeVariable('${v.id}')">✖</button>
@@ -2267,6 +2298,8 @@
     };
 
     window.onload = function() {
+      var ver = document.getElementById('app-version');
+      if (ver) ver.textContent = 'v' + app.VERSION;
       app.init();
     };
   </script>

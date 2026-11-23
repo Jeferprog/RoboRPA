@@ -1,3 +1,5 @@
+node_modules/
+
 # Keyboard Trigger - arquivos gerados na maquina do usuario
 KeyboardTrigger.exe
 keyboardtrigger_log.txt
