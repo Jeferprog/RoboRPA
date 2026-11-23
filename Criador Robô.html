@@ -274,10 +274,12 @@
               .withFailureHandler(function (err) { onDone(null, err); })
               .getRobots();
           } else {
+            var parsed;
             try {
               const saved = localStorage.getItem('cresol_rpa_offline_v7');
-              onDone(saved ? JSON.parse(saved) : [], null);
-            } catch (e) { onDone(null, e); }
+              parsed = saved ? JSON.parse(saved) : [];
+            } catch (e) { onDone(null, e); return; }
+            onDone(parsed, null);
           }
         },
         save(scripts, onDone, onError) {
@@ -299,17 +301,19 @@
       init() {
         this.render();
         this.storage.load((data, error) => {
-          if (error) {
-            this.storageEnabled = false;
-            const w = document.getElementById('storage-warning');
-            if (w) w.style.display = 'block';
-          } else {
-            this.scripts = (data || []).map(s => ({ ...s, variables: s.variables || [], steps: s.steps || [] }));
-            if (this.scripts.length > 0) {
-              this.selectedScriptId = this.scripts[0].id;
-              this.initRunVariables();
+          try {
+            if (error) {
+              this.storageEnabled = false;
+              const w = document.getElementById('storage-warning');
+              if (w) w.style.display = 'block';
+            } else {
+              this.scripts = (data || []).map(s => ({ ...s, variables: s.variables || [], steps: s.steps || [] }));
+              if (this.scripts.length > 0) {
+                this.selectedScriptId = this.scripts[0].id;
+                this.initRunVariables();
+              }
             }
-          }
+          } catch(e) { console.error('Erro ao carregar robôs:', e); }
           this.render();
         });
       },
@@ -455,7 +459,7 @@
         if (!script) return;
         
         this.runVariables = {};
-        script.variables.forEach(v => {
+        (script.variables || []).forEach(v => {
           if (v.type === 'date_calc') {
             const offset = parseInt(v.defaultValue) || 0;
             const d = new Date();
@@ -715,9 +719,10 @@
         vbs += `\n`;
 
         // Declarar e inicializar variáveis no VBScript
-        if (script.variables.length > 0) {
+        const scriptVars = script.variables || [];
+        if (scriptVars.length > 0) {
           vbs += `' --- Inicialização de Variáveis ---\n`;
-          script.variables.forEach(v => {
+          scriptVars.forEach(v => {
             vbs += `Dim ${v.id}\n`;
             if (v.type === 'date_calc') {
               const offset = parseInt(v.defaultValue) || 0;
@@ -857,7 +862,7 @@
                 }
               } else {
                 const varId = parts[i];
-                if (script.variables.some(v => v.id === varId)) {
+                if ((script.variables || []).some(v => v.id === varId)) {
                   vbsParts.push(varId);
                 } else {
                   vbsParts.push('"' + this.escapeVBSText('{{' + varId + '}}') + '"');
@@ -1572,7 +1577,7 @@
       // Substitui {{VAR}} pelo valor real, igual ao VBS gerado
       resolveText(text, script) {
         return (text || '').replace(/\{\{([^}]+)\}\}/g, (m, varId) => {
-          const v = script.variables.find(x => x.id === varId);
+          const v = (script.variables || []).find(x => x.id === varId);
           if (!v) return m;
           if (v.type === 'date_calc') {
             const offset = parseInt(v.defaultValue) || 0;
@@ -1788,7 +1793,7 @@
           list.innerHTML = this.scripts.map(s => `
             <div class="script-item ${this.selectedScriptId === s.id ? 'active' : ''}" onclick="app.selectScript('${s.id}')">
               <div class="script-item-title">${s.name}</div>
-              <div class="script-item-desc">${s.steps.length} passos</div>
+              <div class="script-item-desc">${(s.steps || []).length} passos</div>
             </div>
           `).join('');
         }
@@ -1803,11 +1808,12 @@
         }
 
         let varsHtml = '';
-        if (script.variables.length > 0) {
+        const vars = script.variables || [];
+        if (vars.length > 0) {
           varsHtml = `
             <div class="variables-section">
               <div class="variables-title">⚙️ Parâmetros da Execução</div>
-              ${script.variables.map(v => `
+              ${vars.map(v => `
                 <div class="form-group">
                   <label>
                     ${v.name}
@@ -1878,7 +1884,7 @@
           list.innerHTML = this.scripts.map(s => `
             <div class="script-item ${this.selectedScriptId === s.id ? 'active' : ''}" onclick="app.selectScript('${s.id}')">
               <div class="script-item-title">${s.name}</div>
-              <div class="script-item-desc">${s.steps.length} passos</div>
+              <div class="script-item-desc">${(s.steps || []).length} passos</div>
             </div>
           `).join('');
         }
@@ -2043,6 +2049,8 @@
         const view = document.getElementById('creator-view');
         if (!this.editingScript) return;
 
+        if (!this.editingScript.variables) this.editingScript.variables = [];
+        if (!this.editingScript.steps) this.editingScript.steps = [];
         let varsHtml = this.editingScript.variables.map(v => `
           <div class="var-card">
             <button class="btn-remove-var" onclick="app.removeVariable('${v.id}')">✖</button>
