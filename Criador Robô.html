@@ -304,7 +304,7 @@
             const w = document.getElementById('storage-warning');
             if (w) w.style.display = 'block';
           } else {
-            this.scripts = data || [];
+            this.scripts = (data || []).map(s => ({ ...s, variables: s.variables || [], steps: s.steps || [] }));
             if (this.scripts.length > 0) {
               this.selectedScriptId = this.scripts[0].id;
               this.initRunVariables();
@@ -346,8 +346,9 @@
         const reader = new FileReader();
         reader.onload = (e) => {
           try {
-            const importedScripts = JSON.parse(e.target.result);
-            if (Array.isArray(importedScripts)) {
+            const importedRaw = JSON.parse(e.target.result);
+            if (Array.isArray(importedRaw)) {
+              const importedScripts = importedRaw.map(s => ({ ...s, variables: s.variables || [], steps: s.steps || [] }));
               // Pergunta se quer substituir ou adicionar
               if (this.scripts.length > 0) {
                 if (confirm("Deseja substituir os robôs atuais pelos importados? (Clique em OK para substituir, ou Cancelar para apenas adicionar à lista existente)")) {
