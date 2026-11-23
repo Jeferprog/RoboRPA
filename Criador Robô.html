@@ -500,7 +500,7 @@
       // Funções de Passos
       addStep(type) {
         // Adiciona o novo passo na posição selecionada pelo usuário
-        const defaults = { wait:'1000', key:'Tab', combo:'Tab', run:'calc.exe', site:'https://www.cresol.com.br', focus:'Mozilla Firefox', anchor:'1' };
+        const defaults = { wait:'1000', key:'Tab', combo:'Tab', run:'calc.exe', site:'https://www.cresol.com.br', focus:'Mozilla Firefox', anchor:'1', totp:'' };
         const step = { id: this.generateId(), type, value: defaults[type] || '', description:'' };
         if (type === 'combo') { step.ctrl = false; step.alt = true; step.shift = false; } // começa como Alt+Tab
         // Insere no ponto escolhido pelo usuário (padrão: topo). Avança o ponto para manter a ordem.
@@ -616,7 +616,7 @@
       },
       // Pausas padrão (ms) após cada tipo de ação
       defaultPause(type) {
-        return type === 'site' ? 6000 : type === 'run' ? 1000 : type === 'type' ? 500 : 300;
+        return type === 'site' ? 6000 : type === 'run' ? 1000 : type === 'totp' ? 1000 : type === 'type' ? 500 : 300;
       },
       // Pausa efetiva de um passo: usa a definida pelo usuário, senão o padrão do tipo
       stepPause(step) {
@@ -691,6 +691,11 @@
           vbs += `Set ffFso = CreateObject("Scripting.FileSystemObject")\n`;
           vbs += `ff64 = "C:\\Program Files\\Mozilla Firefox\\firefox.exe"\n`;
           vbs += `ff32 = "C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe"\n`;
+        }
+
+        const hasTotp = script.steps.some(s => s.type === 'totp');
+        if (hasTotp) {
+          vbs += `Dim totpCmd, totpExec, totpCode\n`;
         }
 
         // --- Modo Depuração: log em arquivo + narração em voz ---
@@ -817,6 +822,26 @@
             if (tabs > 0) {
               vbs += `${indent}WshShell.SendKeys "{TAB ${tabs}}" ' entra na pagina (${tabs} Tab fixo)\n`;
             }
+            vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
+          } else if (step.type === 'totp') {
+            const secret = (step.value || '').replace(/"/g, '""').replace(/\s/g, '').toUpperCase();
+            vbs += `${indent}' ${step.description || 'Gerar e digitar código TOTP'}\n`;
+            vbs += `${indent}totpCmd = "powershell -NoProfile -ExecutionPolicy Bypass -Command """ & _\n`;
+            vbs += `${indent}  "$b32 = '${secret}'; " & _\n`;
+            vbs += `${indent}  "$map = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; " & _\n`;
+            vbs += `${indent}  "$bits = ''; foreach ($c in $b32.ToCharArray()) { $i = $map.IndexOf([char]::ToUpper($c)); if ($i -ge 0) { $bits += [Convert]::ToString($i, 2).PadLeft(5, '0') } }; " & _\n`;
+            vbs += `${indent}  "$bytes = New-Object System.Collections.Generic.List[byte]; for ($i = 0; $i + 8 -le $bits.Length; $i += 8) { $bytes.Add([Convert]::ToByte($bits.Substring($i, 8), 2)) }; " & _\n`;
+            vbs += `${indent}  "$key = $bytes.ToArray(); " & _\n`;
+            vbs += `${indent}  "$epoch = [math]::Floor(([DateTimeOffset]::UtcNow.ToUnixTimeSeconds()) / 30); " & _\n`;
+            vbs += `${indent}  "$tb = [BitConverter]::GetBytes([int64]$epoch); [Array]::Reverse($tb); " & _\n`;
+            vbs += `${indent}  "$hmac = New-Object System.Security.Cryptography.HMACSHA1(,$key); $hash = $hmac.ComputeHash($tb); " & _\n`;
+            vbs += `${indent}  "$off = $hash[$hash.Length - 1] -band 0x0F; " & _\n`;
+            vbs += `${indent}  "$code = (($hash[$off] -band 0x7F) -shl 24) -bor (($hash[$off+1] -band 0xFF) -shl 16) -bor (($hash[$off+2] -band 0xFF) -shl 8) -bor ($hash[$off+3] -band 0xFF); " & _\n`;
+            vbs += `${indent}  "Write-Host (($code % 1000000).ToString('D6'))" & _\n`;
+            vbs += `${indent}  """"\n`;
+            vbs += `${indent}Set totpExec = CreateObject("WScript.Shell").Exec(totpCmd)\n`;
+            vbs += `${indent}totpCode = Trim(totpExec.StdOut.ReadLine())\n`;
+            vbs += `${indent}WshShell.SendKeys totpCode\n`;
             vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
           } else if (step.type === 'type') {
             let text = step.value;
@@ -1574,6 +1599,7 @@
         if (step.type === 'site') return { icon: '🌐', title: 'Abrir site (Firefox)', detail: `${step.value}${suffix}`, delay: this.stepPause(step) };
         if (step.type === 'focus') return { icon: '🎯', title: 'Focar janela (Firefox)', detail: `Trazer "${step.value || 'Mozilla Firefox'}" para a frente${suffix}`, delay: this.stepPause(step) };
         if (step.type === 'anchor') return { icon: '📍', title: 'Início padrão (ancorar foco)', detail: `Ctrl+L + ${Math.max(0, parseInt(step.value) || 0)} Tab — origem fixa a cada execução${suffix}`, delay: this.stepPause(step) };
+        if (step.type === 'totp') return { icon: '🔐', title: 'Código TOTP (Authenticator)', detail: `Gera e digita o código de 6 dígitos${suffix}`, delay: this.stepPause(step) };
         if (step.type === 'type') return { icon: '🔤', title: 'Digitar texto', detail: `"${this.resolveText(step.value, script)}"${suffix}`, delay: this.stepPause(step) };
         return { icon: '•', title: step.type, detail: `${step.value}${suffix}`, delay: 300 };
       },
@@ -2087,9 +2113,17 @@
               </div>
               <span style="font-size:12px; color:#6b7280;">📍 <strong>Início padrão:</strong> foca a barra de endereço (sempre o mesmo ponto) e entra na página com um nº fixo de Tabs. Coloque este passo <strong>logo após Abrir Site</strong>, assim toda execução começa do mesmo lugar.</span>
             </div>`;
+          } else if (s.type === 'totp') {
+            inputHtml = `<div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:13px; color:#374151;">Chave secreta:</span>
+                <input type="password" value="${s.value || ''}" onchange="app.updateStep('${s.id}', 'value', this.value)" placeholder="JBSWY3DPEHPK3PXP" style="flex:1; font-family:monospace; letter-spacing:2px;">
+              </div>
+              <span style="font-size:12px; color:#6b7280;">🔐 <strong>Código TOTP:</strong> gera automaticamente o código de 6 dígitos do Google Authenticator e digita no campo em foco. Para obter a chave secreta, ao cadastrar o MFA no sistema, copie a <strong>chave manual</strong> (texto em Base32, geralmente ao lado do QR Code). A chave fica salva apenas neste navegador.</span>
+            </div>`;
           }
 
-          const icon = s.type === 'key' ? '⌨️' : s.type === 'combo' ? '🎹' : s.type === 'type' ? '🔤' : s.type === 'wait' ? '⏱️' : s.type === 'site' ? '🌐' : s.type === 'focus' ? '🎯' : s.type === 'anchor' ? '📍' : '🚀';
+          const icon = s.type === 'key' ? '⌨️' : s.type === 'combo' ? '🎹' : s.type === 'type' ? '🔤' : s.type === 'wait' ? '⏱️' : s.type === 'site' ? '🌐' : s.type === 'focus' ? '🎯' : s.type === 'anchor' ? '📍' : s.type === 'totp' ? '🔐' : '🚀';
           const stepNumber = index + 1;
 
           return `
@@ -2201,6 +2235,7 @@
                   <button onclick="app.addStep('site')">🌐 Abrir Site (Firefox)</button>
                   <button onclick="app.addStep('focus')">🎯 Focar Firefox</button>
                   <button onclick="app.addStep('anchor')">📍 Início padrão (foco fixo)</button>
+                  <button onclick="app.addStep('totp')">🔐 Código TOTP (Authenticator)</button>
                 </div>
               </div>
               <div style="padding: 12px 20px; background: #f0fdf4; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between;">
