@@ -1610,12 +1610,14 @@
         bat += 'echo Apos parar, o arquivo sera salvo na\r\n';
         bat += 'echo mesma pasta deste .bat.\r\n';
         bat += 'echo.\r\n';
+        bat += 'set "BATDIR=%~dp0"\r\n';
         bat += 'pause\r\n';
         bat += 'echo.\r\n';
         bat += 'echo Iniciando gravacao... Pressione F9 para parar.\r\n';
         bat += 'echo.\r\n';
         bat += '\r\n';
         bat += 'powershell -NoProfile -ExecutionPolicy Bypass -Command "& {\r\n';
+        bat += 'if ($env:BATDIR) { $batDir = $env:BATDIR } else { $batDir = [Environment]::GetFolderPath(\"Desktop\") }\r\n';
         bat += 'Add-Type -TypeDefinition @' + "'" + '\r\n';
         bat += 'using System;\r\n';
         bat += 'using System.Runtime.InteropServices;\r\n';
@@ -1739,7 +1741,7 @@
         bat += 'Write-Host \"\"\r\n';
         bat += 'Write-Host \"Gravacao finalizada! $($json.Split(' + "'" + '\"type\"' + "'" + ').Length - 1) passos capturados.\"\r\n';
         bat += '\r\n';
-        bat += '$outFile = Join-Path $PSScriptRoot \"gravacao_rpa.json\"\r\n';
+        bat += '$outFile = Join-Path $batDir \"gravacao_rpa.json\"\r\n';
         bat += '[System.IO.File]::WriteAllText($outFile, $json, [System.Text.Encoding]::UTF8)\r\n';
         bat += 'Write-Host \"Arquivo salvo em: $outFile\"\r\n';
         bat += 'Write-Host \"\"\r\n';
