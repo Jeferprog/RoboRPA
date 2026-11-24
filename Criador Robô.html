@@ -1691,7 +1691,7 @@
         ps += '    static string Q(string s) { return "\\"" + s.Replace("\\\\","\\\\\\\\").Replace("\\"","\\\\\\"") + "\\""; }\r\n';
         ps += '    static string T(string t, string v) { return "{" + Q("type") + ":" + Q(t) + "," + Q("value") + ":" + Q(v) + "}"; }\r\n';
         ps += '}\r\n';
-        ps += "'" + '\r\n';
+        ps += "'@\r\n";
         ps += '\r\n';
         ps += '$json = [KeyRecorder]::Run()\r\n';
         ps += 'Write-Host ""\r\n';
