@@ -854,12 +854,12 @@
             vbs += `${indent}  "$bits = ''; foreach ($c in $b32.ToCharArray()) { $i = $map.IndexOf([char]::ToUpper($c)); if ($i -ge 0) { $bits += [Convert]::ToString($i, 2).PadLeft(5, '0') } }; " & _\n`;
             vbs += `${indent}  "$bytes = New-Object System.Collections.Generic.List[byte]; for ($i = 0; $i + 8 -le $bits.Length; $i += 8) { $bytes.Add([Convert]::ToByte($bits.Substring($i, 8), 2)) }; " & _\n`;
             vbs += `${indent}  "$key = $bytes.ToArray(); " & _\n`;
-            vbs += `${indent}  "$epoch = [math]::Floor(([DateTimeOffset]::UtcNow.ToUnixTimeSeconds()) / 30); " & _\n`;
+            vbs += `${indent}  "$epoch = [math]::Floor(([DateTime]::UtcNow - [DateTime]::new(1970,1,1,0,0,0,[DateTimeKind]::Utc)).TotalSeconds / 30); " & _\n`;
             vbs += `${indent}  "$tb = [BitConverter]::GetBytes([int64]$epoch); [Array]::Reverse($tb); " & _\n`;
             vbs += `${indent}  "$hmac = New-Object System.Security.Cryptography.HMACSHA1(,$key); $hash = $hmac.ComputeHash($tb); " & _\n`;
             vbs += `${indent}  "$off = $hash[$hash.Length - 1] -band 0x0F; " & _\n`;
             vbs += `${indent}  "$code = (($hash[$off] -band 0x7F) -shl 24) -bor (($hash[$off+1] -band 0xFF) -shl 16) -bor (($hash[$off+2] -band 0xFF) -shl 8) -bor ($hash[$off+3] -band 0xFF); " & _\n`;
-            vbs += `${indent}  "Write-Host (($code % 1000000).ToString('D6'))" & _\n`;
+            vbs += `${indent}  "Write-Output (($code % 1000000).ToString('D6'))" & _\n`;
             vbs += `${indent}  """"\n`;
             vbs += `${indent}Set totpExec = CreateObject("WScript.Shell").Exec(totpCmd)\n`;
             vbs += `${indent}totpCode = Trim(totpExec.StdOut.ReadLine())\n`;
