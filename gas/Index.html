@@ -886,9 +886,16 @@
             vbs += `${indent}' ${step.description || 'Gerar e digitar código TOTP'}\n`;
             vbs += `${indent}Set totpExec = CreateObject("WScript.Shell").Exec("powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand ${psEncoded}")\n`;
             vbs += `${indent}totpCode = Replace(Replace(Trim(totpExec.StdOut.ReadAll()), vbCr, ""), vbLf, "")\n`;
+            vbs += `${indent}Set totpDbgFso = CreateObject("Scripting.FileSystemObject")\n`;
+            vbs += `${indent}Set totpDbgFile = totpDbgFso.CreateTextFile(totpDbgFso.GetSpecialFolder(2) & "\\totp_rpa_debug.txt", True)\n`;
+            vbs += `${indent}totpDbgFile.WriteLine "Code=[" & totpCode & "] Len=" & Len(totpCode) & " IsNum=" & IsNumeric(totpCode)\n`;
             vbs += `${indent}If Len(totpCode) = 6 And IsNumeric(totpCode) Then\n`;
+            vbs += `${indent}  totpDbgFile.WriteLine "SendKeys chamado"\n`;
             vbs += `${indent}  WshShell.SendKeys totpCode\n`;
+            vbs += `${indent}Else\n`;
+            vbs += `${indent}  totpDbgFile.WriteLine "SendKeys NAO chamado - check falhou"\n`;
             vbs += `${indent}End If\n`;
+            vbs += `${indent}totpDbgFile.Close\n`;
             vbs += `${indent}${sleepCmd} ${this.stepPause(step)}\n`;
           } else if (step.type === 'type') {
             let text = step.value;
